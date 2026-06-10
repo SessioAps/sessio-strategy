@@ -156,8 +156,14 @@ const COL_WIDTH: Record<Zoom, string> = {
   years5: "w-72",
 };
 
-export default function TimeScale({ milestones }: { milestones: Milestone[] }) {
-  const [zoom, setZoom] = useState<Zoom>("month");
+export default function TimeScale({
+  milestones,
+  initialZoom,
+}: {
+  milestones: Milestone[];
+  initialZoom?: Zoom;
+}) {
+  const [zoom, setZoom] = useState<Zoom>(initialZoom ?? "month");
   // Anchor is set after mount so server + first client render match.
   const [anchor, setAnchor] = useState<Date | null>(null);
   useEffect(() => {
@@ -264,7 +270,7 @@ export default function TimeScale({ milestones }: { milestones: Milestone[] }) {
                             className="h-1.5 w-1.5 shrink-0 rounded-full"
                             style={{ backgroundColor: AREAS[ev.m.area].color }}
                           />
-                          {AREAS[ev.m.area].short}
+                          {ev.m.source === "calendar" ? "📅 hello@" : AREAS[ev.m.area].short}
                           {ev.m.location && <span className="truncate">· {ev.m.location}</span>}
                         </div>
                       </div>

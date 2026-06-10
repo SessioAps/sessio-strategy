@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getBoard, getLadder, getMilestones, getSectors } from "@/app/lib/store";
+import { getBoard, getEvents, getLadder, getSectors } from "@/app/lib/store";
 import {
   AREA_ORDER,
   AREAS,
@@ -39,7 +39,7 @@ function relativeLabel(start: Date, end: Date, today: Date): string {
 export default async function HomePage() {
   const [board, milestones, ladder, sectors] = await Promise.all([
     getBoard(),
-    getMilestones(),
+    getEvents(),
     getLadder(),
     getSectors(),
   ]);

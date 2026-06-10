@@ -96,4 +96,18 @@ export async function getSectors(): Promise<Sectors> {
   return (await readKey<Sectors>("sectors")) ?? {};
 }
 
+// Events synced from the hello@sessio.io calendar — empty if unset.
+export async function getCalendarEvents(): Promise<Milestone[]> {
+  return (await readKey<Milestone[]>("calendar")) ?? [];
+}
+
+// Everything dated, one stream: strategic milestones + the shared calendar.
+export async function getEvents(): Promise<Milestone[]> {
+  const [milestones, calendar] = await Promise.all([
+    getMilestones(),
+    getCalendarEvents(),
+  ]);
+  return [...milestones, ...calendar].sort((a, b) => a.iso.localeCompare(b.iso));
+}
+
 export const storageBackend = usingKv ? "kv" : "file";

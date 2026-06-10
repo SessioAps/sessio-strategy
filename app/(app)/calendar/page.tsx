@@ -1,10 +1,10 @@
 import CalendarView from "@/app/components/CalendarView";
-import { getMilestones } from "@/app/lib/store";
+import { getEvents } from "@/app/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
-  const milestones = await getMilestones();
+  const milestones = await getEvents();
 
   return (
     <div className="px-6 py-8 md:px-10 md:py-10">
