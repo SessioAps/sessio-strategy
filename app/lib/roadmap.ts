@@ -123,6 +123,11 @@ export function emptyBoard(): Board {
   return b;
 }
 
+// Per-sector strategy content (long-term vision + current focus). Lives in the
+// private store, not in code.
+export type SectorInfo = { vision?: string; focus?: string };
+export type Sectors = Partial<Record<Area, SectorInfo>>;
+
 export type Milestone = {
   id: string;
   title: string;

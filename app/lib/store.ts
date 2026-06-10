@@ -9,7 +9,12 @@
 
 import { promises as fs } from "fs";
 import path from "path";
-import { emptyBoard, type Board, type Milestone } from "@/app/lib/roadmap";
+import {
+  emptyBoard,
+  type Board,
+  type Milestone,
+  type Sectors,
+} from "@/app/lib/roadmap";
 import type { LadderPayload } from "@/app/lib/ladder";
 
 const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
@@ -84,6 +89,11 @@ export async function getLadder(): Promise<LadderPayload> {
 // Milestones — empty list if unset.
 export async function getMilestones(): Promise<Milestone[]> {
   return (await readKey<Milestone[]>("milestones")) ?? [];
+}
+
+// Per-sector vision + focus — empty if unset.
+export async function getSectors(): Promise<Sectors> {
+  return (await readKey<Sectors>("sectors")) ?? {};
 }
 
 export const storageBackend = usingKv ? "kv" : "file";

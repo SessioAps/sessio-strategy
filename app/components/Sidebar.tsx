@@ -7,7 +7,7 @@ import { AREA_ORDER, AREAS, type Area } from "@/app/lib/roadmap";
 const DIVISIONS: Area[] = AREA_ORDER.filter((a) => a !== "milestones");
 
 const TOP = [
-  { href: "/", label: "Vision" },
+  { href: "/", label: "Home" },
   { href: "/ladder", label: "Product ladder" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/calendar", label: "Calendar" },
