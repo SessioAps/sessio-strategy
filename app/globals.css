@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --surface: #131214;
+  --surface-elevated: #1a1a1c;
+  --surface-2: #202023;
+  --border: #2a2a2e;
+  --border-strong: #3a3a40;
+  --muted: #8f9098;
+  --muted-strong: #c5c6cc;
+
+  /* Sessio brand accents — used to color-code divisions */
+  --accent-blue: #2563eb; /* Development */
+  --accent-pink: #f4438d; /* PR */
+  --accent-yellow: #ffdd33; /* Financials */
+  --accent-green: #3ed4b1; /* People */
+  --accent-purple: #aa6dfc; /* Strategy */
+  --accent-coral: #e36f46; /* Events */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-pink: var(--accent-pink);
+  --color-accent-yellow: var(--accent-yellow);
+  --color-accent-green: var(--accent-green);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-coral: var(--accent-coral);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-inter), system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.col-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Subtle radial wash so pure black isn't flat */
+.board-bg {
+  background:
+    radial-gradient(1200px 600px at 12% -10%, rgba(37, 99, 235, 0.1), transparent 60%),
+    radial-gradient(1000px 600px at 98% 0%, rgba(244, 67, 141, 0.07), transparent 55%),
+    #000000;
+  min-height: 100vh;
+}
+
+/* Thin, on-brand scrollbars */
+.col-scroll,
+.app-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.col-scroll::-webkit-scrollbar,
+.app-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.col-scroll::-webkit-scrollbar-thumb,
+.app-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+/* Status / meta pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
