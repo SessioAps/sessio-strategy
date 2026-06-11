@@ -49,6 +49,13 @@ export default function Sidebar() {
             active={pathname === `/division/${a}`}
           />
         ))}
+
+        <div className="eyebrow mt-6 mb-1.5 px-3">Share</div>
+        <NavLink
+          href="/investor"
+          label="Investor board"
+          active={pathname.startsWith("/investor")}
+        />
       </nav>
 
     </aside>
