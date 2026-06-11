@@ -10,6 +10,7 @@ const TOP = [
   { href: "/", label: "Home" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/ladder", label: "Product ladder" },
+  { href: "/pipeline", label: "Publishers" },
 ];
 
 export default function Sidebar() {

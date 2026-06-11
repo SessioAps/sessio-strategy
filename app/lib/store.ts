@@ -130,3 +130,20 @@ export async function getEvents(): Promise<Milestone[]> {
 }
 
 export const storageBackend = usingKv ? "kv" : "file";
+
+// Publisher / partner pipeline — dialogues and their stages.
+export type Deal = {
+  id: string;
+  org: string;
+  kind: string;
+  stage: string;
+  contacts?: string;
+  owner?: string;
+  last?: string;
+  next?: string;
+};
+export type Pipeline = { stages: string[]; deals: Deal[] };
+
+export async function getPipeline(): Promise<Pipeline> {
+  return (await readKey<Pipeline>("pipeline")) ?? { stages: [], deals: [] };
+}
