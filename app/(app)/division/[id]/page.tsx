@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBoard, getEvents, getPipeline, getSectors } from "@/app/lib/store";
+import { getBoard, getEvents, getPipeline, getSectors, getVisionItems } from "@/app/lib/store";
 import {
   AREAS,
   AREA_ORDER,
@@ -47,11 +47,13 @@ export default async function DivisionPage({
   if (!isArea(id)) notFound();
   const area = id;
   const meta = AREAS[area];
-  const [board, allEvents, sectors] = await Promise.all([
+  const [board, allEvents, sectors, visionItems] = await Promise.all([
     getBoard(),
     getEvents(),
     getSectors(),
+    getVisionItems(),
   ]);
+  const areaVision = (await visionItems).filter((v) => v.area === id);
   const sector = sectors[area] ?? {};
   const pipeline = area === "b2b" ? await getPipeline() : null;
 
@@ -182,8 +184,17 @@ export default async function DivisionPage({
                     <p className="text-[15px] leading-relaxed text-foreground">
                       {sector.vision ?? meta.objective}
                     </p>
-                    <p className="mt-2 text-[11px] text-muted">
-                      Every step above climbs toward this.
+                    {areaVision.length > 0 && (
+                      <ul className="mt-3 flex flex-col gap-1.5 border-t border-white/10 pt-3">
+                        {areaVision.map((v) => (
+                          <li key={v.id} className="text-[13px] leading-snug text-muted-strong">
+                            <span style={{ color: meta.color }}>○</span> {v.title}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="mt-3 text-[11px] text-muted">
+                      Direction, not dated commitments.
                     </p>
                   </div>
                 ) : (

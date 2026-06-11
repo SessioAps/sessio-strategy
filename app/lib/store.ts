@@ -121,12 +121,22 @@ export async function getCalendarEvents(): Promise<Milestone[]> {
 }
 
 // Everything dated, one stream: strategic milestones + the shared calendar.
+// Vision items are excluded — they're direction, not dated commitments, so they
+// never appear on the timeline / home / sector journeys as promises.
 export async function getEvents(): Promise<Milestone[]> {
   const [milestones, calendar] = await Promise.all([
     getMilestones(),
     getCalendarEvents(),
   ]);
-  return [...milestones, ...calendar].sort((a, b) => a.iso.localeCompare(b.iso));
+  return [...milestones, ...calendar]
+    .filter((m) => !m.vision)
+    .sort((a, b) => a.iso.localeCompare(b.iso));
+}
+
+// Direction markers — the "where this ends up" outcomes we can't put a promised
+// date on. Shown under the vision, never on the timeline.
+export async function getVisionItems(): Promise<Milestone[]> {
+  return (await getMilestones()).filter((m) => m.vision);
 }
 
 export const storageBackend = usingKv ? "kv" : "file";
