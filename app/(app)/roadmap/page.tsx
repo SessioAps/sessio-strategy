@@ -1,49 +1,43 @@
-import Link from "next/link";
-import RoadmapBoard from "@/app/components/RoadmapBoard";
-import { getBoard } from "@/app/lib/store";
+import RoadmapViews from "@/app/components/RoadmapViews";
+import { getBoard, getEvents } from "@/app/lib/store";
 
 export const dynamic = "force-dynamic";
 
-// Jump anywhere in time from the board: straight into the right timeline zoom,
-// or to the visions on the sector pages via Home.
-const TIME_JUMPS = [
-  { label: "Tomorrow", href: "/timeline?zoom=day" },
-  { label: "This week", href: "/timeline?zoom=week" },
-  { label: "This month", href: "/timeline?zoom=month" },
-  { label: "This year", href: "/timeline?zoom=year" },
-  { label: "5 years", href: "/timeline?zoom=years5" },
-  { label: "◆ The vision", href: "/" },
-];
+const ZOOMS = ["day", "week", "month", "year", "years5"] as const;
+type Zoom = (typeof ZOOMS)[number];
 
-export default async function RoadmapPage() {
-  const initialBoard = await getBoard();
+export default async function RoadmapPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; zoom?: string }>;
+}) {
+  const { view, zoom } = await searchParams;
+  const initialZoom: Zoom | undefined = ZOOMS.includes(zoom as Zoom)
+    ? (zoom as Zoom)
+    : undefined;
+  const initialView = view === "time" || initialZoom ? ("time" as const) : undefined;
+  const [initialBoard, events] = await Promise.all([getBoard(), getEvents()]);
 
   return (
     <div className="px-6 py-8 md:px-10 md:py-10">
       <header className="mb-6 border-b border-border pb-6">
         <p className="eyebrow mb-2">Roadmap</p>
         <h1 className="text-2xl font-semibold tracking-tight">
-          The whole strategy, at a glance
+          One plan, two lenses
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-muted">
-          Divisions down the side, time across the top. Drag a card to move it,
-          click to edit, or open a division for the full journey.
+          By sector to see who owns what; by time to see when it lands — from
+          tomorrow out to the 5-year horizon. Drag, click, and move things; every
+          change is journaled back into the docs.
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[11px] text-muted">Jump in time:</span>
-          {TIME_JUMPS.map((j) => (
-            <Link
-              key={j.label}
-              href={j.href}
-              className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted transition-colors hover:border-border-strong hover:text-foreground"
-            >
-              {j.label}
-            </Link>
-          ))}
-        </div>
       </header>
 
-      <RoadmapBoard initialBoard={initialBoard} />
+      <RoadmapViews
+        initialBoard={initialBoard}
+        events={events}
+        initialView={initialView}
+        initialZoom={initialZoom}
+      />
     </div>
   );
 }

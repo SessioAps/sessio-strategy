@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBoard, saveBoard } from "@/app/lib/store";
+import { appendChange, getBoard, saveBoard } from "@/app/lib/store";
 import type { Board } from "@/app/lib/roadmap";
 
 // Always hit storage fresh; never cache the board.
@@ -24,6 +24,11 @@ export async function PUT(request: Request) {
   }
   try {
     await saveBoard(board);
+    await appendChange({
+      at: new Date().toISOString(),
+      kind: "board",
+      summary: "Board rearranged / cards edited",
+    });
   } catch {
     return NextResponse.json({ error: "save failed" }, { status: 500 });
   }

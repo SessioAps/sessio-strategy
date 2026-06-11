@@ -8,10 +8,8 @@ const DIVISIONS: Area[] = AREA_ORDER.filter((a) => a !== "milestones");
 
 const TOP = [
   { href: "/", label: "Home" },
-  { href: "/ladder", label: "Product ladder" },
   { href: "/roadmap", label: "Roadmap" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/timeline", label: "Timeline" },
+  { href: "/ladder", label: "Product ladder" },
 ];
 
 export default function Sidebar() {

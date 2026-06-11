@@ -164,6 +164,10 @@ export default function TimeScale({
   initialZoom?: Zoom;
 }) {
   const [zoom, setZoom] = useState<Zoom>(initialZoom ?? "month");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editIso, setEditIso] = useState("");
+  const [editIsoEnd, setEditIsoEnd] = useState("");
+  const [saving, setSaving] = useState(false);
   // Anchor is set after mount so server + first client render match.
   const [anchor, setAnchor] = useState<Date | null>(null);
   useEffect(() => {
@@ -190,6 +194,25 @@ export default function TimeScale({
 
   const navBtn =
     "flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted transition-colors hover:border-border-strong hover:text-foreground";
+
+  async function moveEvent(id: string, iso: string, isoEnd: string) {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/events", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, iso, isoEnd: isoEnd || null }),
+      });
+      if (res.ok) {
+        window.location.reload();
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    setSaving(false);
+    setEditingId(null);
+  }
 
   return (
     <div>
@@ -253,15 +276,70 @@ export default function TimeScale({
                     inBucket.map((ev) => (
                       <div
                         key={ev.m.id}
-                        className="rounded-lg border border-border bg-surface-elevated p-2.5"
+                        className="group/ev rounded-lg border border-border bg-surface-elevated p-2.5"
                         style={{ borderLeft: `3px solid ${AREAS[ev.m.area].color}` }}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10.5px] font-medium text-muted-strong">
                             {ev.m.date}
                           </span>
-                          <StatusPill status={ev.m.status} />
+                          <span className="flex items-center gap-1.5">
+                            {!ev.m.source && (
+                              <button
+                                type="button"
+                                title="Move this in time"
+                                onClick={() => {
+                                  setEditingId(ev.m.id);
+                                  setEditIso(ev.m.iso);
+                                  setEditIsoEnd(ev.m.isoEnd ?? "");
+                                }}
+                                className="text-muted opacity-0 transition-opacity hover:text-foreground group-hover/ev:opacity-100"
+                              >
+                                ✎
+                              </button>
+                            )}
+                            <StatusPill status={ev.m.status} />
+                          </span>
                         </div>
+                        {editingId === ev.m.id && (
+                          <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-border bg-surface p-2">
+                            <label className="text-[10px] text-muted">
+                              Start
+                              <input
+                                type="date"
+                                value={editIso}
+                                onChange={(e) => setEditIso(e.target.value)}
+                                className="mt-0.5 w-full rounded border border-border bg-background px-1.5 py-1 text-[11px] text-foreground"
+                              />
+                            </label>
+                            <label className="text-[10px] text-muted">
+                              End (optional)
+                              <input
+                                type="date"
+                                value={editIsoEnd}
+                                onChange={(e) => setEditIsoEnd(e.target.value)}
+                                className="mt-0.5 w-full rounded border border-border bg-background px-1.5 py-1 text-[11px] text-foreground"
+                              />
+                            </label>
+                            <div className="mt-1 flex gap-1.5">
+                              <button
+                                type="button"
+                                disabled={saving || !editIso}
+                                onClick={() => moveEvent(ev.m.id, editIso, editIsoEnd)}
+                                className="flex-1 rounded bg-foreground px-2 py-1 text-[11px] font-medium text-background disabled:opacity-40"
+                              >
+                                {saving ? "Moving…" : "Move"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(null)}
+                                className="rounded border border-border px-2 py-1 text-[11px] text-muted"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <div className="mt-0.5 text-[12.5px] font-medium leading-snug">
                           {ev.m.title}
                         </div>

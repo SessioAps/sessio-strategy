@@ -96,6 +96,25 @@ export async function getSectors(): Promise<Sectors> {
   return (await readKey<Sectors>("sectors")) ?? {};
 }
 
+export async function saveMilestones(milestones: Milestone[]): Promise<void> {
+  await writeKey("milestones", milestones);
+}
+
+// Change journal — every edit made through the site is recorded here so the
+// changes can be swept back into sessio-docs as real commits (the docs stay
+// the source of truth; the journal is the bridge). Capped at the last 500.
+export type ChangeEntry = {
+  at: string; // ISO timestamp
+  kind: "board" | "event";
+  summary: string;
+};
+
+export async function appendChange(entry: ChangeEntry): Promise<void> {
+  const log = (await readKey<ChangeEntry[]>("changes")) ?? [];
+  log.push(entry);
+  await writeKey("changes", log.slice(-500));
+}
+
 // Events synced from the hello@sessio.io calendar — empty if unset.
 export async function getCalendarEvents(): Promise<Milestone[]> {
   return (await readKey<Milestone[]>("calendar")) ?? [];

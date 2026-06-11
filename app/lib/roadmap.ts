@@ -123,9 +123,10 @@ export function emptyBoard(): Board {
   return b;
 }
 
-// Per-sector strategy content (long-term vision + current focus). Lives in the
-// private store, not in code.
-export type SectorInfo = { vision?: string; focus?: string };
+// Per-sector strategy content (long-term vision + current focus + document
+// folders on SharePoint/OneDrive). Lives in the private store, not in code.
+export type SectorLink = { label: string; url: string };
+export type SectorInfo = { vision?: string; focus?: string; links?: SectorLink[] };
 export type Sectors = Partial<Record<Area, SectorInfo>>;
 
 export type Milestone = {

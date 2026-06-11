@@ -102,6 +102,30 @@ export default async function DivisionPage({
             {sector.focus}
           </p>
         )}
+        {(sector.links?.length ?? 0) > 0 && (
+          <div className="mt-3.5 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] text-muted">Folders:</span>
+            {sector.links!.map((l) => (
+              <a
+                key={l.url}
+                href={l.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted transition-colors hover:border-border-strong hover:text-foreground"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                </svg>
+                {l.label}
+                <span aria-hidden>↗</span>
+              </a>
+            ))}
+          </div>
+        )}
         {allCards.length > 0 && (
           <div className="mt-4">
             <ProgressBar cards={allCards} showLegend />

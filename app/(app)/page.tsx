@@ -81,7 +81,7 @@ export default async function HomePage() {
           <div className="mb-3 flex items-baseline justify-between">
             <p className="eyebrow">Happening</p>
             <Link
-              href="/timeline"
+              href="/roadmap?view=time"
               className="text-[11px] text-muted underline-offset-4 hover:text-foreground hover:underline"
             >
               Timeline →
