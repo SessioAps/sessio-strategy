@@ -53,6 +53,16 @@ export default async function DealPage({
 
       <div className="grid max-w-4xl gap-6 lg:grid-cols-2">
         <section className="flex flex-col gap-3">
+          <div className="rounded-xl border border-border bg-surface-elevated p-4">
+            <p className="eyebrow mb-1.5">Next meeting</p>
+            {deal.nextMeeting ? (
+              <p className="text-[13.5px] leading-relaxed text-foreground">
+                {deal.nextMeeting.at} — {deal.nextMeeting.label}
+              </p>
+            ) : (
+              <p className="text-[13.5px] text-muted">None booked — worth fixing?</p>
+            )}
+          </div>
           {deal.last && (
             <div className="rounded-xl border border-border bg-surface-elevated p-4">
               <p className="eyebrow mb-1.5">Latest</p>

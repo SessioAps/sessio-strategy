@@ -225,6 +225,9 @@ export default async function DivisionPage({
                           {d.contacts && d.contacts !== "—" && (
                             <p className="mt-1 text-[11.5px] text-muted">{d.contacts}{d.owner ? ` · ${d.owner}` : ""}</p>
                           )}
+                          {d.nextMeeting && (
+                            <p className="mt-1.5 text-[11.5px] font-medium" style={{ color: meta.color }}>📅 {d.nextMeeting.at} · {d.nextMeeting.label}</p>
+                          )}
                           {d.last && <p className="mt-2 text-[12px] leading-snug text-muted-strong">{d.last}</p>}
                           {d.next && (
                             <p className="mt-1.5 text-[12px] leading-snug text-muted"><span className="col-label mr-1.5">Next</span>{d.next}</p>
