@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPipeline } from "@/app/lib/store";
+import StagePicker from "./StagePicker";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,10 @@ export default async function DealPage({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">{deal.org}</h1>
           <span className="pill border border-border text-muted">{deal.kind}</span>
-          {deal.owner && <span className="ml-auto text-[12px] text-muted">Owner: {deal.owner}</span>}
+          <span className="ml-auto flex items-center gap-2.5">
+            {deal.owner && <span className="text-[12px] text-muted">Owner: {deal.owner}</span>}
+            <StagePicker id={deal.id} stage={deal.stage} stages={stages} />
+          </span>
         </div>
         {deal.contacts && deal.contacts !== "—" && (
           <p className="mt-1.5 text-sm text-muted-strong">{deal.contacts}</p>
