@@ -71,6 +71,22 @@ function RungRow({ rung }: { rung: Rung }) {
           </span>
         </div>
         <p className="mt-1.5 text-[13px] leading-snug text-muted">{rung.scope}</p>
+        {(rung.app || rung.portal) && (
+          <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
+            {rung.app && (
+              <div className="rounded-lg bg-surface px-2.5 py-2">
+                <span className="col-label" style={{ color: "#2563eb" }}>App</span>
+                <p className="mt-0.5 text-[12px] leading-snug text-muted-strong">{rung.app}</p>
+              </div>
+            )}
+            {rung.portal && (
+              <div className="rounded-lg bg-surface px-2.5 py-2">
+                <span className="col-label" style={{ color: "#3ed4b1" }}>Portal</span>
+                <p className="mt-0.5 text-[12px] leading-snug text-muted-strong">{rung.portal}</p>
+              </div>
+            )}
+          </div>
+        )}
         {rung.runsOn.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {rung.runsOn.map((r) => (

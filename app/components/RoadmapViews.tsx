@@ -34,16 +34,16 @@ export default function RoadmapViews({
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center gap-2.5">
-        <div className="flex overflow-hidden rounded-lg border border-border">
+        <div className="flex gap-1 rounded-xl border border-border-strong bg-surface p-1">
           {(["board", "time"] as View[]).map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setView(v)}
-              className={`px-4 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
                 view === v
-                  ? "bg-white/[0.09] text-foreground"
-                  : "text-muted hover:text-foreground"
+                  ? "bg-foreground text-background"
+                  : "text-muted hover:bg-white/[0.06] hover:text-foreground"
               }`}
             >
               {v === "board" ? "By sector" : "By time"}

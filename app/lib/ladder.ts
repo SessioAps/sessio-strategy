@@ -12,6 +12,8 @@ export type Rung = {
   scope: string;
   runsOn: string[]; // "Web" | "App" | "Portal"
   status: RungStatus;
+  app?: string; // app surface at this rung (parity crosswalk)
+  portal?: string; // portal surface at this rung
 };
 
 export type CoreRelease = { from: string; to: string; label: string };
