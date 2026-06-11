@@ -23,6 +23,15 @@ export default async function NetworkPage() {
               {c.org && <span className="text-[12px] text-muted">{c.org}</span>}
             </div>
             {c.role && <p className="mt-0.5 text-[12px] text-muted-strong">{c.role}</p>}
+            {(c.email || c.phone) && (
+              <p className="mt-1 text-[12px]">
+                {c.email && (
+                  <a href={`mailto:${c.email}`} className="text-muted underline-offset-4 hover:text-foreground hover:underline">{c.email}</a>
+                )}
+                {c.email && c.phone && <span className="text-muted"> · </span>}
+                {c.phone && <span className="text-muted">{c.phone}</span>}
+              </p>
+            )}
             {c.note && <p className="mt-1.5 text-[12px] leading-snug text-muted">{c.note}</p>}
             {(c.tags?.length ?? 0) > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">

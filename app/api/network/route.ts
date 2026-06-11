@@ -4,7 +4,7 @@ import { addContact, appendChange } from "@/app/lib/store";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  let body: { name?: string; org?: string; role?: string; note?: string };
+  let body: { name?: string; org?: string; role?: string; note?: string; email?: string; phone?: string };
   try {
     body = await request.json();
   } catch {
@@ -18,6 +18,8 @@ export async function POST(request: Request) {
     org: body.org?.trim() || undefined,
     role: body.role?.trim() || undefined,
     note: body.note?.trim() || undefined,
+    email: body.email?.trim() || undefined,
+    phone: body.phone?.trim() || undefined,
   });
   await appendChange({ at: new Date().toISOString(), kind: "event", summary: `Contact added: ${name}` });
   return NextResponse.json({ ok: true });

@@ -157,6 +157,8 @@ export type Contact = {
   name: string;
   org?: string;
   role?: string;
+  email?: string;
+  phone?: string;
   tags?: string[];
   note?: string;
 };
