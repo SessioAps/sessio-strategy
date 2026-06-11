@@ -200,14 +200,6 @@ export default async function DivisionPage({
           ))}
         </ol>
 
-        <p className="mt-2 text-xs text-muted">
-          Dated items come from the strategy milestones and the hello@sessio.io
-          calendar; undated ones from the{" "}
-          <Link href="/roadmap" className="underline underline-offset-4">
-            roadmap board
-          </Link>
-          . Click a card to unfold the detail.
-        </p>
       </div>
     </div>
   );

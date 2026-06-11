@@ -16,10 +16,6 @@ export default async function LadderPage() {
       <header className="mb-7 border-b border-border pb-6">
         <p className="eyebrow mb-2">Product roadmap</p>
         <h1 className="text-2xl font-semibold tracking-tight">The M-ladder</h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-muted">
-          Sessio ships as a sequence of mini-launches. Mirrored from{" "}
-          <span className="text-muted-strong">{LADDER_SOURCE}</span>.
-        </p>
       </header>
 
       {rungs.length === 0 ? (

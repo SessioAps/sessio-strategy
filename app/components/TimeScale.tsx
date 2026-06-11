@@ -361,9 +361,6 @@ export default function TimeScale({
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-muted">
-        Zoom from day to 5 years. Multi-day events appear in every bucket they touch.
-      </p>
     </div>
   );
 }

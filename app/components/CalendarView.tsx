@@ -176,9 +176,6 @@ export default function CalendarView({ milestones }: { milestones: Milestone[] }
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-muted">
-        Strategic events &amp; milestones. Slide with ← → or jump back with Today.
-      </p>
     </div>
   );
 }

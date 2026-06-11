@@ -25,11 +25,6 @@ export default async function RoadmapPage({
         <h1 className="text-2xl font-semibold tracking-tight">
           One plan, two lenses
         </h1>
-        <p className="mt-1.5 max-w-2xl text-sm text-muted">
-          By sector to see who owns what; by time to see when it lands — from
-          tomorrow out to the 5-year horizon. Drag, click, and move things; every
-          change is journaled back into the docs.
-        </p>
       </header>
 
       <RoadmapViews

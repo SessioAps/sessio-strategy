@@ -49,11 +49,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto px-3 pt-6 text-[11px] leading-relaxed text-muted">
-        Internal strategy board.
-        <br />
-        Drag, filter, zoom, click through.
-      </div>
     </aside>
   );
 }
