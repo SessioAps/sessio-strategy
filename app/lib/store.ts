@@ -147,3 +147,29 @@ export type Pipeline = { stages: string[]; deals: Deal[] };
 export async function getPipeline(): Promise<Pipeline> {
   return (await readKey<Pipeline>("pipeline")) ?? { stages: [], deals: [] };
 }
+
+// Network — people we meet and mention; maintained by Claude from meetings
+// and conversations, plus manual adds on /network.
+export type Contact = {
+  id: string;
+  name: string;
+  org?: string;
+  role?: string;
+  tags?: string[];
+  note?: string;
+};
+export async function getNetwork(): Promise<Contact[]> {
+  return (await readKey<Contact[]>("network")) ?? [];
+}
+export async function addContact(c: Contact): Promise<void> {
+  const all = await getNetwork();
+  all.push(c);
+  await writeKey("network", all);
+}
+
+// AI hub — short headlines on where it's all going (Moonshots pod + industry),
+// refreshed by the morning sync.
+export type AiItem = { id: string; headline: string; take: string; source?: string; date?: string };
+export async function getAiItems(): Promise<AiItem[]> {
+  return (await readKey<AiItem[]>("ai")) ?? [];
+}

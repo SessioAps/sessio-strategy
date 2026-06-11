@@ -12,7 +12,9 @@ export type Area =
   | "people"
   | "financials"
   | "pr"
-  | "events";
+  | "events"
+  | "b2b"
+  | "b2c";
 
 export type Time = "now" | "next" | "later";
 
@@ -54,6 +56,8 @@ export const AREA_ORDER: Area[] = [
   "financials",
   "pr",
   "events",
+  "b2b",
+  "b2c",
 ];
 
 export const AREAS: Record<
@@ -101,6 +105,20 @@ export const AREAS: Record<
     short: "Events",
     color: "#e36f46",
     objective: "Show up where the music industry gathers.",
+  },
+  b2b: {
+    label: "B2B",
+    short: "B2B",
+    color: "#22d3ee",
+    objective: "Publishers, labels, and PROs as paying partners on the portal.",
+    owner: "Johannes",
+  },
+  b2c: {
+    label: "B2C",
+    short: "B2C",
+    color: "#a3e635",
+    objective: "Creators choosing Sessio — signups, activation, community.",
+    owner: "Mattis",
   },
 };
 
