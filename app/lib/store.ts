@@ -188,6 +188,23 @@ export async function getAiItems(): Promise<AiItem[]> {
   return (await readKey<AiItem[]>("ai")) ?? [];
 }
 
+// Team — the people building Sessio. Shown on /team and on the investor board.
+export type TeamMember = {
+  id: string;
+  name: string;
+  role?: string;
+  email?: string;
+  linkedin?: string;
+};
+export async function getTeam(): Promise<TeamMember[]> {
+  return (await readKey<TeamMember[]>("team")) ?? [];
+}
+export async function addTeamMember(m: TeamMember): Promise<void> {
+  const all = await getTeam();
+  all.push(m);
+  await writeKey("team", all);
+}
+
 // Investor board — a separate, walled-off surface. Holds curated updates and
 // links to the access-controlled data room (cap table & SHA live in SharePoint,
 // never here). Maintained by the team; investors only read.
@@ -207,6 +224,7 @@ export type InvestorBoard = {
   intro?: string;
   updates: InvestorUpdate[];
   dataRoom: DataRoomLink[];
+  links?: DataRoomLink[];
 };
 
 export async function getInvestorBoard(): Promise<InvestorBoard> {

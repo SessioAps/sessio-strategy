@@ -11,6 +11,7 @@ const TOP = [
   { href: "/roadmap", label: "Roadmap" },
   { href: "/ladder", label: "Product ladder" },
   { href: "/network", label: "Network" },
+  { href: "/team", label: "Team" },
   { href: "/ai", label: "AI hub" },
 ];
 

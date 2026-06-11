@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { AUTH_COOKIE, roleForCookie } from "@/app/lib/auth";
-import { getEvents, getInvestorBoard, getLadder } from "@/app/lib/store";
+import { getEvents, getInvestorBoard, getLadder, getTeam } from "@/app/lib/store";
 import PostUpdate from "./PostUpdate";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,11 @@ export default async function InvestorPage() {
   );
   const isTeam = role === "team";
 
-  const [board, events, ladder] = await Promise.all([
+  const [board, events, ladder, team] = await Promise.all([
     getInvestorBoard(),
     getEvents(),
     getLadder(),
+    getTeam(),
   ]);
   // Progress, not promises: only what has already shipped/happened. No dated
   // forward commitments on the investor board — momentum lives in the updates.
@@ -125,6 +126,43 @@ export default async function InvestorPage() {
           {board.dataRoom.length === 0 && <p className="text-[13px] text-muted">No documents linked yet.</p>}
         </div>
       </section>
+
+      {/* Team */}
+      {team.length > 0 && (
+        <section className="mt-9">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Team</h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {team.map((m) => (
+              <div key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface-elevated p-3.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface text-[11px] font-semibold text-muted-strong">
+                  {m.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase()}
+                </span>
+                <div>
+                  <p className="text-[14px] font-semibold leading-tight">{m.name}</p>
+                  {m.role && <p className="text-[12px] text-muted">{m.role}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Follow along */}
+      {(board.links?.length ?? 0) > 0 && (
+        <section className="mt-9">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">Follow along</h2>
+          <div className="flex flex-wrap gap-2">
+            {board.links!.map((l, i) => (
+              <a key={`${l.label}-${i}`} href={l.url} target="_blank" rel="noopener noreferrer"
+                 className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-3.5 py-2 text-[13px] text-foreground transition-colors hover:border-border-strong">
+                {l.label}
+                {l.note && <span className="text-[11px] text-muted">· {l.note}</span>}
+                <span className="text-muted">↗</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <footer className="mt-10 border-t border-border pt-5 text-[11px] text-muted">
         Confidential, for Sessio investors. Please don&apos;t forward.
