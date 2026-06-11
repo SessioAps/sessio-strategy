@@ -31,7 +31,7 @@ export default async function InvestorPage() {
       {isTeam && (
         <div className="mb-6 flex items-center justify-between rounded-xl border border-dashed border-border-strong bg-surface/40 px-4 py-2.5">
           <p className="text-[12px] text-muted">
-            Team preview — this is what investors see. Investors can reach <span className="text-foreground">only</span> this page.
+            Team preview. This is what investors see. Investors can reach <span className="text-foreground">only</span> this page.
           </p>
           <PostUpdate />
         </div>
@@ -112,7 +112,7 @@ export default async function InvestorPage() {
           <span className="text-[11px] text-muted">Access granted individually</span>
         </div>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-          The cap table and shareholders&apos; agreement live in our secured SharePoint, permissioned per investor. If a link asks you to request access, that&apos;s expected — we approve it to you directly.
+          The cap table and shareholders&apos; agreement live in our secured SharePoint, permissioned per investor. If a link asks you to request access, that&apos;s expected. We approve it to you directly.
         </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {board.dataRoom.map((d) => (
@@ -127,7 +127,7 @@ export default async function InvestorPage() {
       </section>
 
       <footer className="mt-10 border-t border-border pt-5 text-[11px] text-muted">
-        Confidential — for Sessio investors. Please don&apos;t forward.
+        Confidential, for Sessio investors. Please don&apos;t forward.
       </footer>
     </div>
   );
