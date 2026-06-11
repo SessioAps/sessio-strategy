@@ -28,9 +28,11 @@ export default async function InvestorPage() {
   today.setHours(0, 0, 0, 0);
 
   // Auto, investor-safe highlights from the roadmap — no internal detail.
-  const wins = events.filter((e) => e.status === "done").slice(-4).reverse();
-  const next = events
+  const inv = events.filter((e) => e.investor);
+  const wins = inv.filter((e) => e.status === "done").slice(-4).reverse();
+  const next = inv
     .filter((e) => parseISO(e.isoEnd ?? e.iso) >= today && e.status !== "done")
+    .sort((a, b) => a.iso.localeCompare(b.iso))
     .slice(0, 5);
   const shipped = ladder.rungs.filter((r) => r.status === "shipped").length;
   const building = ladder.rungs.find((r) => r.status === "building");

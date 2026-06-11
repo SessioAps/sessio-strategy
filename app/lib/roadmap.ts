@@ -157,6 +157,7 @@ export type Milestone = {
   location?: string;
   status?: Status;
   source?: "calendar"; // set when synced from the hello@sessio.io calendar
+  investor?: boolean; // surface on the investor board — strategic/commercial only
 };
 
 // EMPTY in the public repo — real milestones load from the private store.
