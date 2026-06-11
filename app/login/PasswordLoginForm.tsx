@@ -23,7 +23,8 @@ export default function PasswordLoginForm() {
         body: JSON.stringify({ password }),
       });
       if (res.ok) {
-        window.location.href = "/";
+        const data = (await res.json().catch(() => ({}))) as { redirect?: string };
+        window.location.href = data.redirect ?? "/";
         return;
       }
       setError(true);
@@ -35,13 +36,13 @@ export default function PasswordLoginForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      <p className="mb-5 text-sm text-muted">Enter the team password to continue.</p>
+      <p className="mb-5 text-sm text-muted">Enter your password to continue.</p>
       <input
         type="password"
         autoFocus
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="Team password"
+        placeholder="Password"
         className={INPUT}
       />
       {error && (

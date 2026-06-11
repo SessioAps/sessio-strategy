@@ -177,3 +177,39 @@ export type AiItem = { id: string; headline: string; take: string; source?: stri
 export async function getAiItems(): Promise<AiItem[]> {
   return (await readKey<AiItem[]>("ai")) ?? [];
 }
+
+// Investor board — a separate, walled-off surface. Holds curated updates and
+// links to the access-controlled data room (cap table & SHA live in SharePoint,
+// never here). Maintained by the team; investors only read.
+export type InvestorUpdate = {
+  id: string;
+  date: string; // YYYY-MM
+  title: string;
+  body: string;
+  tag?: string; // "Team" | "Product" | "Fundraise" | "Traction" | …
+};
+export type DataRoomLink = {
+  label: string;
+  url: string;
+  note?: string;
+};
+export type InvestorBoard = {
+  intro?: string;
+  updates: InvestorUpdate[];
+  dataRoom: DataRoomLink[];
+};
+
+export async function getInvestorBoard(): Promise<InvestorBoard> {
+  return (
+    (await readKey<InvestorBoard>("investor")) ?? {
+      updates: [],
+      dataRoom: [],
+    }
+  );
+}
+
+export async function addInvestorUpdate(update: InvestorUpdate): Promise<void> {
+  const board = await getInvestorBoard();
+  board.updates.unshift(update);
+  await writeKey("investor", board);
+}

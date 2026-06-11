@@ -15,3 +15,23 @@ async function sha256Hex(input: string): Promise<string> {
 export function tokenForPassword(password: string): Promise<string> {
   return sha256Hex(`sessio-roadmap::${password}`);
 }
+
+// Roles. The team password unlocks everything; the investor password unlocks
+// ONLY the investor board (/investor). Tokens differ because the passwords do.
+export type Role = "team" | "investor" | null;
+
+export async function roleForCookie(
+  cookieValue: string | undefined,
+  teamPassword: string | undefined,
+  investorPassword: string | undefined,
+): Promise<Role> {
+  if (!cookieValue) return null;
+  if (teamPassword && cookieValue === (await tokenForPassword(teamPassword)))
+    return "team";
+  if (
+    investorPassword &&
+    cookieValue === (await tokenForPassword(investorPassword))
+  )
+    return "investor";
+  return null;
+}

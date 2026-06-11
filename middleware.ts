@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { AUTH_COOKIE, tokenForPassword } from "@/app/lib/auth";
+import { AUTH_COOKIE, roleForCookie, tokenForPassword } from "@/app/lib/auth";
 import { authMode, getSessioUser, isAllowedEmail } from "@/app/lib/sessio-auth";
 
 // Guard everything except the login page, the auth endpoints, and Next internals.
@@ -23,8 +23,9 @@ export async function middleware(req: NextRequest) {
     return toLogin(req);
   }
 
-  // --- Shared-password mode (default).
+  // --- Shared-password mode (default), now role-aware.
   const password = process.env.ROADMAP_PASSWORD;
+  const investorPassword = process.env.ROADMAP_INVESTOR_PASSWORD;
   if (!password) {
     if (process.env.NODE_ENV === "production") {
       return new NextResponse(
@@ -35,9 +36,24 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const expected = await tokenForPassword(password);
-  if (req.cookies.get(AUTH_COOKIE)?.value === expected) {
-    return NextResponse.next();
+  const role = await roleForCookie(
+    req.cookies.get(AUTH_COOKIE)?.value,
+    password,
+    investorPassword,
+  );
+
+  // Team: full access.
+  if (role === "team") return NextResponse.next();
+
+  // Investor: ONLY the investor board, nothing else. Everything internal
+  // (roadmap, pipeline, financials, network…) is invisible and unreachable.
+  if (role === "investor") {
+    if (req.nextUrl.pathname.startsWith("/investor")) return NextResponse.next();
+    const url = req.nextUrl.clone();
+    url.pathname = "/investor";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
+
   return toLogin(req);
 }
