@@ -5,11 +5,6 @@ import PostUpdate from "./PostUpdate";
 
 export const dynamic = "force-dynamic";
 
-function parseISO(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d ?? 1);
-}
-
 export default async function InvestorPage() {
   const jar = await cookies();
   const role = await roleForCookie(
@@ -24,16 +19,10 @@ export default async function InvestorPage() {
     getEvents(),
     getLadder(),
   ]);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Auto, investor-safe highlights from the roadmap — no internal detail.
+  // Progress, not promises: only what has already shipped/happened. No dated
+  // forward commitments on the investor board — momentum lives in the updates.
   const inv = events.filter((e) => e.investor);
-  const wins = inv.filter((e) => e.status === "done").slice(-4).reverse();
-  const next = inv
-    .filter((e) => parseISO(e.isoEnd ?? e.iso) >= today && e.status !== "done")
-    .sort((a, b) => a.iso.localeCompare(b.iso))
-    .slice(0, 5);
+  const wins = inv.filter((e) => e.status === "done").slice(-6).reverse();
   const shipped = ladder.rungs.filter((r) => r.status === "shipped").length;
   const building = ladder.rungs.find((r) => r.status === "building");
 
@@ -78,33 +67,20 @@ export default async function InvestorPage() {
         </section>
       )}
 
-      {/* Recent wins + what's next */}
-      <section className="mt-8 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-surface/40 p-4">
+      {/* Recent wins — only what has actually shipped/happened */}
+      {wins.length > 0 && (
+        <section className="mt-8 rounded-2xl border border-border bg-surface/40 p-4">
           <p className="eyebrow mb-3">Recent wins</p>
-          <ul className="flex flex-col gap-2">
+          <ul className="grid gap-2 sm:grid-cols-2">
             {wins.map((w) => (
               <li key={w.id} className="text-[13px]">
                 <span className="text-accent-green">●</span> <span className="text-foreground">{w.title}</span>
                 <span className="ml-1 text-[11px] text-muted">· {w.date}</span>
               </li>
             ))}
-            {wins.length === 0 && <li className="text-[13px] text-muted">—</li>}
           </ul>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface/40 p-4">
-          <p className="eyebrow mb-3">What's next</p>
-          <ul className="flex flex-col gap-2">
-            {next.map((n) => (
-              <li key={n.id} className="text-[13px]">
-                <span className="text-muted">○</span> <span className="text-foreground">{n.title}</span>
-                <span className="ml-1 text-[11px] text-muted">· {n.date}</span>
-              </li>
-            ))}
-            {next.length === 0 && <li className="text-[13px] text-muted">—</li>}
-          </ul>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Updates feed */}
       <section className="mt-9">
