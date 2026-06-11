@@ -141,6 +141,7 @@ export type Deal = {
   owner?: string;
   last?: string;
   next?: string;
+  history?: { at: string; note: string }[];
 };
 export type Pipeline = { stages: string[]; deals: Deal[] };
 

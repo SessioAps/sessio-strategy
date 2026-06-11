@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const MISSION =
   "Give music creators and the people around them the tools to make great work together.";
 const VISION =
-  "Become the home base for how the music industry runs sessions and camps — and the community that forms around them.";
+  "In five years, Sessio is the operating system for the music industry — worldwide.";
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
