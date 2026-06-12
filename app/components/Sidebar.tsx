@@ -77,7 +77,7 @@ function NavLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all hover:translate-x-0.5 ${
         active
           ? "bg-white/[0.07] font-medium text-foreground"
           : "text-muted hover:bg-white/[0.03] hover:text-foreground"

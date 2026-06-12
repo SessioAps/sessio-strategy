@@ -118,3 +118,47 @@ h3 {
   line-height: 1.4;
   white-space: nowrap;
 }
+
+/* ---- Polish pass: motion, focus, selection (no layout changes) ---- */
+
+a,
+button,
+select,
+input,
+textarea {
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--foreground) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.45);
+  color: #ffffff;
+}
+
+/* Dates, counts, and meta read steadier with tabular numerals */
+.pill,
+.col-label,
+.eyebrow,
+time {
+  font-variant-numeric: tabular-nums;
+}
+
+h1 {
+  letter-spacing: -0.022em;
+}
+
+/* Cards that link somewhere lift a hair on hover */
+a.card-lift:hover {
+  transform: translateY(-1px);
+}

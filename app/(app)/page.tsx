@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const MISSION =
   "Give music creators and the people around them the tools to make great work together.";
 const VISION =
-  "In five years, Sessio is the operating system for the music industry — worldwide.";
+  "In five years, Sessio is the operating system for the music industry, worldwide.";
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -121,7 +121,7 @@ export default async function HomePage() {
 
         <Link
           href="/ladder"
-          className="group rounded-2xl border border-border bg-surface/40 p-4 transition-colors hover:border-border-strong"
+          className="card-lift group rounded-2xl border border-border bg-surface/40 p-4 transition-colors hover:border-border-strong"
         >
           <div className="mb-3 flex items-baseline justify-between">
             <p className="eyebrow">Product pulse</p>
@@ -187,9 +187,13 @@ export default async function HomePage() {
               <Link
                 key={a}
                 href={`/division/${a}`}
-                className="group flex flex-col rounded-2xl border border-border bg-surface/40 p-5 transition-colors hover:border-border-strong hover:bg-surface"
-                style={{ boxShadow: `inset 0 2px 0 ${AREAS[a].color}` }}
+                className="card-lift group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface/40 p-5 transition-colors hover:border-border-strong hover:bg-surface"
               >
+                <span
+                  aria-hidden
+                  className="absolute inset-x-0 top-0 h-0.5 transition-all group-hover:h-1"
+                  style={{ backgroundColor: AREAS[a].color }}
+                />
                 <div className="flex items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 rounded-full"

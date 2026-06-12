@@ -228,7 +228,7 @@ export default async function DivisionPage({
                     </div>
                     <div className="flex min-h-[100px] flex-col gap-2">
                       {inStage.map((d) => (
-                        <Link key={d.id} href={`/deal/${d.id}`} className="block rounded-xl border border-border bg-surface-elevated p-3.5 transition-colors hover:border-border-strong" style={{ borderLeft: `3px solid ${meta.color}` }}>
+                        <Link key={d.id} href={`/deal/${d.id}`} className="card-lift block rounded-xl border border-border bg-surface-elevated p-3.5 transition-colors hover:border-border-strong" style={{ borderLeft: `3px solid ${meta.color}` }}>
                           <div className="flex items-center gap-2">
                             <h3 className="text-[14px] font-semibold leading-snug">{d.org}</h3>
                             <span className="pill ml-auto border border-border text-muted">{d.kind}</span>

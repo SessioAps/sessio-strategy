@@ -118,7 +118,7 @@ export default async function InvestorPage() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {board.dataRoom.map((d, i) => (
             <a key={`${d.label}-${i}`} href={d.url} target="_blank" rel="noopener noreferrer"
-               className="group flex flex-col rounded-xl border border-border bg-surface-elevated p-3.5 transition-colors hover:border-border-strong">
+               className="card-lift group flex flex-col rounded-xl border border-border bg-surface-elevated p-3.5 transition-colors hover:border-border-strong">
               <span className="text-[13.5px] font-medium text-foreground">🔒 {d.label}</span>
               {d.note && <span className="mt-0.5 text-[11.5px] text-muted">{d.note}</span>}
             </a>

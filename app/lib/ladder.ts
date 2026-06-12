@@ -14,6 +14,9 @@ export type Rung = {
   status: RungStatus;
   app?: string; // app surface at this rung (parity crosswalk)
   portal?: string; // portal surface at this rung
+  // Granular steps, paired where app + portal must land together (one row =
+  // one step; both sides set = ships simultaneously). From app-portal-parity.md.
+  steps?: { app?: string; portal?: string }[];
 };
 
 export type CoreRelease = { from: string; to: string; label: string };
