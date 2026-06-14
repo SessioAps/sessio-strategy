@@ -1,0 +1,6 @@
+# Code owners for the Sessio strategy site.
+# The ladder / rung order is owned by Mattis (ADR-0014).
+
+/app/*/ladder/      @MattisJacobsen
+/app/lib/ladder.ts  @MattisJacobsen
+**/versionRungs.ts  @MattisJacobsen
