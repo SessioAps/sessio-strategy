@@ -86,6 +86,10 @@ export async function getLadder(): Promise<LadderPayload> {
   return saved ?? { rungs: [], coreRelease: null, oneOhMoment: null };
 }
 
+export async function saveLadder(payload: LadderPayload): Promise<void> {
+  await writeKey("ladder", payload);
+}
+
 // Milestones — empty list if unset.
 export async function getMilestones(): Promise<Milestone[]> {
   return (await readKey<Milestone[]>("milestones")) ?? [];

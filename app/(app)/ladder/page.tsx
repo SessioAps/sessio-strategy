@@ -1,6 +1,12 @@
 import { Fragment } from "react";
 import { getLadder } from "@/app/lib/store";
-import { RUNG_STATUS, type OneOhMoment, type Rung } from "@/app/lib/ladder";
+import {
+  RUNG_STATUS,
+  BAND_ORDER,
+  BAND_META,
+  type OneOhMoment,
+  type Rung,
+} from "@/app/lib/ladder";
 
 export const dynamic = "force-dynamic";
 
@@ -46,16 +52,33 @@ export default async function LadderPage() {
             </h2>
           </div>
 
-          <ol className="flex flex-col gap-3">
-            {rungs.map((rung) => (
-              <li key={rung.id}>
-                <RungRow rung={rung} />
-                {oneOhMoment && rung.id === oneOhMoment.after && (
-                  <OneOhMarker moment={oneOhMoment} />
-                )}
-              </li>
-            ))}
-          </ol>
+          {BAND_ORDER.map((band) => {
+            const group = rungs.filter((r) => (r.band ?? "need") === band);
+            if (group.length === 0) return null;
+            const meta = BAND_META[band];
+            return (
+              <section key={band} className="mb-6">
+                <div className="mb-2 mt-5 flex items-baseline gap-2">
+                  <span
+                    className="h-2.5 w-2.5 translate-y-[1px] rounded-full"
+                    style={{ backgroundColor: meta.color }}
+                  />
+                  <h2 className="text-sm font-semibold tracking-tight">{meta.label}</h2>
+                  {meta.sub && <span className="text-xs text-muted">· {meta.sub}</span>}
+                </div>
+                <ol className="flex flex-col gap-3">
+                  {group.map((rung) => (
+                    <li key={rung.id}>
+                      <RungRow rung={rung} />
+                      {oneOhMoment && rung.id === oneOhMoment.after && (
+                        <OneOhMarker moment={oneOhMoment} />
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            );
+          })}
         </div>
       )}
     </div>
