@@ -15,6 +15,7 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  arrayMove,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -127,26 +128,30 @@ export default function LadderEditor({
     const activeIdx = rungs.findIndex((r) => r.id === activeIdStr);
     if (activeIdx === -1) return;
 
-    let targetBand: Band;
-    let overRungId: string | null = null;
+    // Dropped on a band lane (not onto a rung): move to the end of that band's
+    // group and reband.
     if (overId.startsWith("band:")) {
-      targetBand = overId.slice(5) as Band;
-    } else {
-      targetBand = bandOf(overId);
-      overRungId = overId;
+      const targetBand = overId.slice(5) as Band;
+      const moved: Rung = { ...rungs[activeIdx], band: targetBand };
+      const without = rungs.filter((r) => r.id !== activeIdStr);
+      const last = without.map((r) => r.band ?? "need").lastIndexOf(targetBand);
+      const insertAt = last === -1 ? without.length : last + 1;
+      setRungs([...without.slice(0, insertAt), moved, ...without.slice(insertAt)]);
+      return;
     }
 
-    const moved: Rung = { ...rungs[activeIdx], band: targetBand };
-    const without = rungs.filter((r) => r.id !== activeIdStr);
-    let insertAt: number;
-    if (overRungId) {
-      insertAt = without.findIndex((r) => r.id === overRungId);
-      if (insertAt === -1) insertAt = without.length;
-    } else {
-      const last = without.map((r) => r.band ?? "need").lastIndexOf(targetBand);
-      insertAt = last === -1 ? without.length : last + 1;
-    }
-    setRungs([...without.slice(0, insertAt), moved, ...without.slice(insertAt)]);
+    // Dropped onto another rung: reorder with arrayMove using the ORIGINAL
+    // indices (active still present) so the rung lands exactly where the drag
+    // preview shows it — the proven RoadmapBoard semantics. Splicing against a
+    // pre-removed array is off-by-one on downward moves. Then reband to the
+    // target's band; normalize() re-groups stably.
+    const overIdx = rungs.findIndex((r) => r.id === overId);
+    if (overIdx === -1) return;
+    const targetBand = bandOf(overId);
+    const reordered = arrayMove(rungs, activeIdx, overIdx).map((r) =>
+      r.id === activeIdStr ? { ...r, band: targetBand } : r,
+    );
+    setRungs(reordered);
   }
 
   function saveRung(next: Rung) {
