@@ -10,6 +10,7 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
@@ -42,8 +43,8 @@ function isMuted(s?: string): boolean {
   return !s || /n\/a|vision-only|no new surface|not built|stay vision/i.test(s);
 }
 
-// M-stages are a LOCKED backbone — never reordered here. We only group them by
-// band for display (a stage's band can still change via the edit modal).
+// Group rungs by band, stable within a band, so the JSON + the grouped render
+// stay tidy.
 function normalize(rungs: Rung[]): Rung[] {
   return [...rungs].sort(
     (a, b) =>
@@ -51,9 +52,7 @@ function normalize(rungs: Rung[]): Rung[] {
   );
 }
 
-// The movable unit is a single feature chip. Each rung's chips are derived from
-// its steps[] (each side that is set = one chip); fall back to the rung-level
-// app/portal summary when there are no steps.
+// A feature chip = one App or one Portal surface string on a rung.
 function chipsOf(rung: Rung, side: Side): string[] {
   const src =
     rung.steps && rung.steps.length > 0
@@ -62,45 +61,46 @@ function chipsOf(rung: Rung, side: Side): string[] {
   return src.map((s) => s[side]).filter((t): t is string => Boolean(t));
 }
 
-type ChipMap = Record<string, { app: string[]; portal: string[] }>;
-
-function buildChipMap(rungs: Rung[]): ChipMap {
-  const map: ChipMap = {};
-  for (const r of rungs) map[r.id] = { app: chipsOf(r, "app"), portal: chipsOf(r, "portal") };
-  return map;
+// Rebuild ONE rung's steps[] from its app/portal chip lists. Only the rungs a
+// user actually touches get rewritten — every other rung keeps its original
+// steps, so paired {app,portal} steps elsewhere are never collaterally split.
+function rebuildRung(rung: Rung, app: string[], portal: string[]): Rung {
+  const next: Rung = { ...rung };
+  const steps = [...app.map((t) => ({ app: t })), ...portal.map((t) => ({ portal: t }))];
+  if (steps.length) next.steps = steps;
+  else delete next.steps;
+  if (app.length) next.app = app.join(", ");
+  else delete next.app;
+  if (portal.length) next.portal = portal.join(", ");
+  else delete next.portal;
+  return next;
+}
+function sameList(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
-// Serialize chip lists back onto each rung as single-sided steps[] (chips are
-// independent now — no forced app/portal pairing), keeping app/portal summaries.
-function applyChipMap(rungs: Rung[], map: ChipMap): Rung[] {
-  return normalize(
-    rungs.map((r) => {
-      const a = map[r.id]?.app ?? chipsOf(r, "app");
-      const p = map[r.id]?.portal ?? chipsOf(r, "portal");
-      const next: Rung = { ...r };
-      const steps = [...a.map((t) => ({ app: t })), ...p.map((t) => ({ portal: t }))];
-      if (steps.length) next.steps = steps;
-      else delete next.steps;
-      if (a.length) next.app = a.join(", ");
-      else delete next.app;
-      if (p.length) next.portal = p.join(", ");
-      else delete next.portal;
-      return next;
-    }),
-  );
-}
-
-function chipId(rungId: string, side: Side, idx: number) {
-  return `c|${rungId}|${side}|${idx}`;
-}
-function zoneId(rungId: string, side: Side) {
-  return `z|${rungId}|${side}`;
-}
+const chipId = (rungId: string, side: Side, idx: number) => `c|${rungId}|${side}|${idx}`;
+const zoneId = (rungId: string, side: Side) => `z|${rungId}|${side}`;
+const stageId = (rungId: string) => `stage|${rungId}`;
 function parseChip(id: string): { rung: string; side: Side; idx: number } | null {
   const p = id.split("|");
   if (p[0] !== "c") return null;
   return { rung: p[1], side: p[2] as Side, idx: Number(p[3]) };
 }
+
+// Route stage drags only to stage/band targets, chip drags only to chip/zone
+// targets, so the two drag types never interfere.
+const routedCollision: CollisionDetection = (args) => {
+  const activeId = String(args.active.id);
+  const isStage = activeId.startsWith("stage|");
+  const droppableContainers = args.droppableContainers.filter((c) => {
+    const id = String(c.id);
+    return isStage
+      ? id.startsWith("stage|") || id.startsWith("band:")
+      : id.startsWith("c|") || id.startsWith("z|");
+  });
+  return closestCorners({ ...args, droppableContainers });
+};
 
 export default function LadderEditor({
   initialLadder,
@@ -112,7 +112,7 @@ export default function LadderEditor({
     rungs: normalize(initialLadder.rungs),
   }));
   const rungs = ladder.rungs;
-  const [activeChipId, setActiveChipId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Rung | null>(null);
   const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState<"idle" | "saving" | "saved">("idle");
@@ -146,24 +146,53 @@ export default function LadderEditor({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  function setRungs(next: Rung[]) {
+  function commitRungs(next: Rung[]) {
     setLadder((l) => ({ ...l, rungs: next }));
   }
 
   function handleDragStart(e: DragStartEvent) {
-    setActiveChipId(String(e.active.id));
+    setActiveId(String(e.active.id));
   }
 
-  // Move a single chip: reorder within a column, or move to another stage's
-  // same-side column. Stages themselves never move.
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
-    setActiveChipId(null);
+    setActiveId(null);
     if (!over) return;
-    const a = parseChip(String(active.id));
-    if (!a) return;
-
+    const activeStr = String(active.id);
     const overStr = String(over.id);
+    if (activeStr === overStr) return;
+
+    // ---- Whole-stage move (the rung + all its features travel together) ----
+    if (activeStr.startsWith("stage|")) {
+      const aId = activeStr.slice(6);
+      const activeIdx = rungs.findIndex((r) => r.id === aId);
+      if (activeIdx === -1) return;
+      if (overStr.startsWith("band:")) {
+        const targetBand = overStr.slice(5) as Band;
+        const moved: Rung = { ...rungs[activeIdx], band: targetBand };
+        const without = rungs.filter((r) => r.id !== aId);
+        const last = without.map((r) => r.band ?? "need").lastIndexOf(targetBand);
+        const insertAt = last === -1 ? without.length : last + 1;
+        commitRungs(
+          normalize([...without.slice(0, insertAt), moved, ...without.slice(insertAt)]),
+        );
+        return;
+      }
+      if (overStr.startsWith("stage|")) {
+        const overIdx = rungs.findIndex((r) => r.id === overStr.slice(6));
+        if (overIdx === -1) return;
+        const targetBand = rungs[overIdx].band ?? "need";
+        const reordered = arrayMove(rungs, activeIdx, overIdx).map((r) =>
+          r.id === aId ? { ...r, band: targetBand } : r,
+        );
+        commitRungs(normalize(reordered));
+      }
+      return;
+    }
+
+    // ---- Single feature chip move ----
+    const a = parseChip(activeStr);
+    if (!a) return;
     let toRung: string;
     let toSide: Side;
     let toIdx: number;
@@ -179,70 +208,95 @@ export default function LadderEditor({
       toSide = o.side;
       toIdx = o.idx;
     }
-    // App chips live with App, Portal with Portal — never cross sides.
-    if (a.side !== toSide) return;
-    if (a.rung === toRung && a.idx === toIdx) return;
+    if (a.side !== toSide) return; // App stays App, Portal stays Portal
 
-    const map = buildChipMap(rungs);
+    const from = rungs.find((r) => r.id === a.rung);
+    if (!from) return;
+    const fromApp = chipsOf(from, "app");
+    const fromPortal = chipsOf(from, "portal");
+
     if (a.rung === toRung) {
-      const list = map[a.rung][a.side];
-      const dest = toIdx === END ? list.length - 1 : toIdx;
-      map[a.rung][a.side] = arrayMove(list, a.idx, dest);
-    } else {
-      const [text] = map[a.rung][a.side].splice(a.idx, 1);
-      if (text === undefined) return;
-      const destList = map[toRung][toSide];
-      const dest = toIdx === END ? destList.length : toIdx;
-      destList.splice(dest, 0, text);
+      // Reorder within the same column. A drop on the column's empty space
+      // (the zone, toIdx END) is a no-op — never teleport the chip to the end.
+      if (toIdx === END || toIdx === a.idx) return;
+      const moved = arrayMove((a.side === "app" ? fromApp : fromPortal).slice(), a.idx, toIdx);
+      const updated = rebuildRung(
+        from,
+        a.side === "app" ? moved : fromApp,
+        a.side === "portal" ? moved : fromPortal,
+      );
+      commitRungs(normalize(rungs.map((r) => (r.id === a.rung ? updated : r))));
+      return;
     }
-    setRungs(applyChipMap(rungs, map));
+
+    // Move the chip to another stage's same-side column.
+    const to = rungs.find((r) => r.id === toRung);
+    if (!to) return;
+    const srcList = (a.side === "app" ? fromApp : fromPortal).slice();
+    const [text] = srcList.splice(a.idx, 1);
+    if (text === undefined) return;
+    const toApp = chipsOf(to, "app");
+    const toPortal = chipsOf(to, "portal");
+    const dstList = (toSide === "app" ? toApp : toPortal).slice();
+    const dest = toIdx === END ? dstList.length : toIdx;
+    dstList.splice(dest, 0, text);
+    const updatedFrom = rebuildRung(
+      from,
+      a.side === "app" ? srcList : fromApp,
+      a.side === "portal" ? srcList : fromPortal,
+    );
+    const updatedTo = rebuildRung(
+      to,
+      toSide === "app" ? dstList : toApp,
+      toSide === "portal" ? dstList : toPortal,
+    );
+    commitRungs(
+      normalize(rungs.map((r) => (r.id === a.rung ? updatedFrom : r.id === toRung ? updatedTo : r))),
+    );
   }
 
   function deleteChip(rungId: string, side: Side, idx: number) {
-    const map = buildChipMap(rungs);
-    map[rungId][side].splice(idx, 1);
-    setRungs(applyChipMap(rungs, map));
+    const rung = rungs.find((r) => r.id === rungId);
+    if (!rung) return;
+    const app = chipsOf(rung, "app");
+    const portal = chipsOf(rung, "portal");
+    const list = (side === "app" ? app : portal).slice();
+    list.splice(idx, 1);
+    const updated = rebuildRung(rung, side === "app" ? list : app, side === "portal" ? list : portal);
+    commitRungs(normalize(rungs.map((r) => (r.id === rungId ? updated : r))));
   }
 
   function saveStage(next: Rung) {
-    setRungs(normalize(rungs.map((r) => (r === editing ? next : r))));
+    commitRungs(normalize(rungs.map((r) => (r === editing ? next : r))));
     setEditing(null);
   }
 
-  const activeChip = (() => {
-    if (!activeChipId) return null;
-    const a = parseChip(activeChipId);
+  // Drag overlay content.
+  const overlay = (() => {
+    if (!activeId) return null;
+    if (activeId.startsWith("stage|")) {
+      const r = rungs.find((x) => x.id === activeId.slice(6));
+      return r ? <StageSpine rung={r} overlay /> : null;
+    }
+    const a = parseChip(activeId);
     if (!a) return null;
-    return { text: chipsOf(rungs.find((r) => r.id === a.rung) ?? ({} as Rung), a.side)[a.idx], side: a.side };
+    const text = chipsOf(rungs.find((r) => r.id === a.rung) ?? ({} as Rung), a.side)[a.idx];
+    return text ? <Chip text={text} side={a.side} overlay /> : null;
   })();
 
   const bands = BAND_ORDER.map((band) => {
     const group = rungs.filter((r) => (r.band ?? "need") === band);
     if (group.length === 0) return null;
-    const meta = BAND_META[band];
     return (
-      <section key={band} className="mb-6">
-        <div className="mb-2 flex items-baseline gap-2">
-          <span
-            className="h-2.5 w-2.5 translate-y-[1px] rounded-full"
-            style={{ backgroundColor: meta.color }}
-          />
-          <h2 className="text-sm font-semibold tracking-tight">{meta.label}</h2>
-          {meta.sub && <span className="text-xs text-muted">· {meta.sub}</span>}
-        </div>
-        <div className="flex flex-col gap-3">
-          {group.map((rung) => (
-            <RungRow
-              key={rung.id}
-              rung={rung}
-              interactive={mounted}
-              oneOhMoment={ladder.oneOhMoment}
-              onEditStage={() => setEditing(rung)}
-              onDeleteChip={deleteChip}
-            />
-          ))}
-        </div>
-      </section>
+      <BandSection
+        key={band}
+        band={band}
+        group={group}
+        interactive={mounted}
+        oneOhMoment={ladder.oneOhMoment}
+        onEditStage={setEditing}
+        onDeleteChip={deleteChip}
+      />
     );
   });
 
@@ -256,7 +310,7 @@ export default function LadderEditor({
           </span>
         )}
         <span className="ml-auto text-[11px] text-muted">
-          Stages are fixed · drag a feature between stages · click ✎ to edit a stage
+          Drag a stage to move it (features come along) · drag a single feature between stages · ✎ to edit
         </span>
         <SaveDot state={saving} />
       </div>
@@ -276,14 +330,12 @@ export default function LadderEditor({
         <DndContext
           id="sessio-ladder-dnd"
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={routedCollision}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
           {bands}
-          <DragOverlay dropAnimation={null}>
-            {activeChip?.text ? <Chip text={activeChip.text} side={activeChip.side} overlay /> : null}
-          </DragOverlay>
+          <DragOverlay dropAnimation={null}>{overlay}</DragOverlay>
         </DndContext>
       ) : (
         bands
@@ -314,68 +366,193 @@ function SaveDot({ state }: { state: "idle" | "saving" | "saved" }) {
   );
 }
 
-function RungRow({
-  rung,
+function BandSection({
+  band,
+  group,
   interactive,
   oneOhMoment,
   onEditStage,
   onDeleteChip,
 }: {
-  rung: Rung;
+  band: Band;
+  group: Rung[];
   interactive: boolean;
+  oneOhMoment: OneOhMoment | null;
+  onEditStage: (rung: Rung) => void;
+  onDeleteChip: (rungId: string, side: Side, idx: number) => void;
+}) {
+  const meta = BAND_META[band];
+  const { setNodeRef, isOver } = useDroppable({ id: `band:${band}` });
+
+  const rows = group.map((rung) =>
+    interactive ? (
+      <SortableRungRow
+        key={rung.id}
+        rung={rung}
+        oneOhMoment={oneOhMoment}
+        onEditStage={() => onEditStage(rung)}
+        onDeleteChip={onDeleteChip}
+      />
+    ) : (
+      <div key={rung.id}>
+        <RowInner rung={rung} interactive={false} />
+        {oneOhMoment && rung.id === oneOhMoment.after && <OneOhMarker moment={oneOhMoment} />}
+      </div>
+    ),
+  );
+
+  return (
+    <section className="mb-6">
+      <div className="mb-2 flex items-baseline gap-2">
+        <span
+          className="h-2.5 w-2.5 translate-y-[1px] rounded-full"
+          style={{ backgroundColor: meta.color }}
+        />
+        <h2 className="text-sm font-semibold tracking-tight">{meta.label}</h2>
+        {meta.sub && <span className="text-xs text-muted">· {meta.sub}</span>}
+      </div>
+      {interactive ? (
+        <div
+          ref={setNodeRef}
+          className={`rounded-xl p-1 transition-colors ${isOver ? "bg-white/[0.02]" : ""}`}
+        >
+          <SortableContext
+            items={group.map((r) => stageId(r.id))}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-3">{rows}</div>
+          </SortableContext>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">{rows}</div>
+      )}
+    </section>
+  );
+}
+
+function SortableRungRow({
+  rung,
+  oneOhMoment,
+  onEditStage,
+  onDeleteChip,
+}: {
+  rung: Rung;
   oneOhMoment: OneOhMoment | null;
   onEditStage: () => void;
   onDeleteChip: (rungId: string, side: Side, idx: number) => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: stageId(rung.id),
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <RowInner
+        rung={rung}
+        interactive
+        handleProps={{ ...attributes, ...listeners }}
+        onEditStage={onEditStage}
+        onDeleteChip={onDeleteChip}
+      />
+      {oneOhMoment && rung.id === oneOhMoment.after && <OneOhMarker moment={oneOhMoment} />}
+    </div>
+  );
+}
+
+function RowInner({
+  rung,
+  interactive,
+  handleProps,
+  onEditStage,
+  onDeleteChip,
+}: {
+  rung: Rung;
+  interactive: boolean;
+  handleProps?: Record<string, unknown>;
+  onEditStage?: () => void;
+  onDeleteChip?: (rungId: string, side: Side, idx: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <ChipColumn
+        rungId={rung.id}
+        side="app"
+        chips={chipsOf(rung, "app")}
+        interactive={interactive}
+        onDeleteChip={onDeleteChip}
+      />
+      <StageSpine
+        rung={rung}
+        handleProps={handleProps}
+        onEdit={onEditStage}
+        draggable={interactive}
+      />
+      <ChipColumn
+        rungId={rung.id}
+        side="portal"
+        chips={chipsOf(rung, "portal")}
+        interactive={interactive}
+        onDeleteChip={onDeleteChip}
+      />
+    </div>
+  );
+}
+
+function StageSpine({
+  rung,
+  handleProps,
+  onEdit,
+  draggable,
+  overlay,
+}: {
+  rung: Rung;
+  handleProps?: Record<string, unknown>;
+  onEdit?: () => void;
+  draggable?: boolean;
+  overlay?: boolean;
+}) {
   const st = RUNG_STATUS[rung.status];
   return (
-    <>
-      <div className="flex items-center gap-3">
-        <ChipColumn
-          rungId={rung.id}
-          side="app"
-          chips={chipsOf(rung, "app")}
-          interactive={interactive}
-          onDeleteChip={onDeleteChip}
-        />
-        {/* Locked stage spine */}
-        <div
-          className="group/stage relative flex w-[150px] shrink-0 flex-col items-center justify-center gap-1 self-center rounded-xl border border-border bg-surface/60 px-2 py-2.5 text-center"
-          style={{ borderLeft: `3px solid ${st.color}` }}
+    <div
+      {...(handleProps ?? {})}
+      className={`group/stage relative flex w-[150px] shrink-0 flex-col items-center justify-center gap-1 self-center rounded-xl border border-border bg-surface/60 px-2 py-2.5 text-center ${
+        draggable ? "cursor-grab touch-none transition-colors hover:border-white/15 active:cursor-grabbing" : ""
+      } ${overlay ? "rotate-[1deg] shadow-2xl shadow-black/60 ring-1 ring-white/10" : ""}`}
+      style={{ borderLeft: `3px solid ${st.color}` }}
+    >
+      {onEdit && (
+        <button
+          type="button"
+          aria-label="Edit stage"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-white/10 hover:text-foreground group-hover/stage:opacity-100"
         >
-          <button
-            type="button"
-            aria-label="Edit stage"
-            onClick={onEditStage}
-            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-white/10 hover:text-foreground group-hover/stage:opacity-100"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-          <span className="font-mono text-[12px] font-semibold text-muted-strong">{rung.id}</span>
-          <span className="text-[12px] font-medium leading-tight">{rung.name}</span>
-          <span className="pill" style={{ color: st.color, backgroundColor: `${st.color}1f` }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />
-            {st.label}
-          </span>
-        </div>
-        <ChipColumn
-          rungId={rung.id}
-          side="portal"
-          chips={chipsOf(rung, "portal")}
-          interactive={interactive}
-          onDeleteChip={onDeleteChip}
-        />
-      </div>
-      {oneOhMoment && rung.id === oneOhMoment.after && <OneOhMarker moment={oneOhMoment} />}
-    </>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      )}
+      <span className="font-mono text-[12px] font-semibold text-muted-strong">{rung.id}</span>
+      <span className="text-[12px] font-medium leading-tight">{rung.name}</span>
+      <span className="pill" style={{ color: st.color, backgroundColor: `${st.color}1f` }}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />
+        {st.label}
+      </span>
+    </div>
   );
 }
 
@@ -390,7 +567,7 @@ function ChipColumn({
   side: Side;
   chips: string[];
   interactive: boolean;
-  onDeleteChip: (rungId: string, side: Side, idx: number) => void;
+  onDeleteChip?: (rungId: string, side: Side, idx: number) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: zoneId(rungId, side) });
   const inner = (
@@ -398,10 +575,10 @@ function ChipColumn({
       ref={interactive ? setNodeRef : undefined}
       className={`flex min-h-[44px] flex-1 flex-col gap-1.5 rounded-lg p-1 ${
         side === "app" ? "items-end" : "items-start"
-      } ${interactive && isOver ? "bg-white/[0.04]" : ""}`}
+      } ${interactive && isOver ? "bg-white/[0.05]" : ""}`}
     >
-      {chips.length === 0 && (
-        <span className="px-2 py-1 text-[11px] text-muted/40">{interactive ? "drop here" : ""}</span>
+      {interactive && chips.length === 0 && (
+        <span className="px-2 py-1 text-[11px] text-muted/40">drop here</span>
       )}
       {chips.map((text, i) =>
         interactive ? (
@@ -410,7 +587,7 @@ function ChipColumn({
             id={chipId(rungId, side, i)}
             text={text}
             side={side}
-            onDelete={() => onDeleteChip(rungId, side, i)}
+            onDelete={() => onDeleteChip?.(rungId, side, i)}
           />
         ) : (
           <Chip key={i} text={text} side={side} />
@@ -526,7 +703,7 @@ function OneOhMarker({ moment }: { moment: OneOhMoment }) {
   );
 }
 
-// --- Stage edit modal (metadata + the stage's feature lists) ----------------
+// --- Stage edit modal -------------------------------------------------------
 const FIELD =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted focus:border-white/25";
 const LABEL = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted";
@@ -558,21 +735,19 @@ function StageEditor({
     if (!cleanName) return;
     const a = appChips.map((t) => t.trim()).filter(Boolean);
     const p = portalChips.map((t) => t.trim()).filter(Boolean);
-    const steps = [...a.map((t) => ({ app: t })), ...p.map((t) => ({ portal: t }))];
-    const next: Rung = {
-      ...initial,
-      name: cleanName,
-      scope: scope.trim(),
-      runsOn,
-      status,
-      band,
-      ...(a.length ? { app: a.join(", ") } : {}),
-      ...(p.length ? { portal: p.join(", ") } : {}),
-      ...(steps.length ? { steps } : {}),
-    };
-    if (!a.length) delete next.app;
-    if (!p.length) delete next.portal;
-    if (!steps.length) delete next.steps;
+    const next: Rung = { ...initial, name: cleanName, scope: scope.trim(), runsOn, status, band };
+    // Only rewrite the features (which splits paired app↔portal steps into
+    // single-sided ones) when they actually changed — a pure rename/status/band
+    // edit keeps the original steps[] intact.
+    if (!sameList(a, chipsOf(initial, "app")) || !sameList(p, chipsOf(initial, "portal"))) {
+      const steps = [...a.map((t) => ({ app: t })), ...p.map((t) => ({ portal: t }))];
+      if (a.length) next.app = a.join(", ");
+      else delete next.app;
+      if (p.length) next.portal = p.join(", ");
+      else delete next.portal;
+      if (steps.length) next.steps = steps;
+      else delete next.steps;
+    }
     onSave(next);
   }
 
@@ -588,7 +763,7 @@ function StageEditor({
       >
         <h3 className="mb-1 text-sm font-semibold">Edit stage</h3>
         <p className="mb-4 text-[11px] text-muted">
-          <span className="font-mono">{initial.id}</span> is a fixed stage — its position is locked.
+          <span className="font-mono">{initial.id}</span> — rename, restage, or edit its features.
         </p>
 
         <label className={LABEL}>Name</label>
