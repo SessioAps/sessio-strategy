@@ -109,7 +109,7 @@ export async function saveMilestones(milestones: Milestone[]): Promise<void> {
 // the source of truth; the journal is the bridge). Capped at the last 500.
 export type ChangeEntry = {
   at: string; // ISO timestamp
-  kind: "board" | "event";
+  kind: "board" | "event" | "ladder";
   summary: string;
 };
 
