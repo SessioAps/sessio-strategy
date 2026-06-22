@@ -75,35 +75,86 @@ function chipsWithDone(rung: Rung, side: Side): { text: string; done: boolean }[
   return out;
 }
 
-// Every checkable side on a rung is done.
+// Every REAL (non-muted) checkable side on a rung is done. Muted placeholders
+// like "n/a" / "vision-only" are ignored — they neither block nor trigger
+// shipped, and they render without a checkbox.
 function allStepsDone(rung: Rung): boolean {
   if (!rung.steps || rung.steps.length === 0) return false;
-  return rung.steps.every((s) => (!s.app || s.appDone) && (!s.portal || s.portalDone));
-}
-
-// Status follows completion: all steps done => shipped; un-completing a shipped
-// rung drops it back to "in build". Otherwise the manual status sticks.
-function recomputeStatus(rung: Rung): RungStatus {
-  if (allStepsDone(rung)) return "shipped";
-  if (rung.status === "shipped") return "building";
-  return rung.status;
-}
-
-// Rebuild ONE rung's steps[] from its app/portal chip lists, preserving each
-// chip's done state by text match (so reordering/moving keeps the checkmarks of
-// chips that stayed). Only touched rungs are rewritten — paired {app,portal}
-// steps elsewhere are never collaterally split.
-function rebuildRung(rung: Rung, app: string[], portal: string[]): Rung {
-  const doneApp = new Map<string, boolean>();
-  const donePortal = new Map<string, boolean>();
-  for (const s of rung.steps ?? []) {
-    if (s.app) doneApp.set(s.app, Boolean(s.appDone));
-    if (s.portal) donePortal.set(s.portal, Boolean(s.portalDone));
+  let real = 0;
+  let done = 0;
+  for (const s of rung.steps) {
+    if (s.app && !isMuted(s.app)) {
+      real += 1;
+      if (s.appDone) done += 1;
+    }
+    if (s.portal && !isMuted(s.portal)) {
+      real += 1;
+      if (s.portalDone) done += 1;
+    }
   }
+  return real > 0 && done === real;
+}
+
+// Status follows completion. Auto-shipping remembers the prior manual status in
+// preShipStatus so un-completing restores it (not a blanket drop to "in build").
+// A manually-shipped rung (no preShipStatus) stays shipped when unchecked.
+function withDerivedStatus(rung: Rung): Rung {
+  const next: Rung = { ...rung };
+  if (allStepsDone(next)) {
+    if (next.status !== "shipped") {
+      next.preShipStatus = next.status;
+      next.status = "shipped";
+    }
+  } else if (next.status === "shipped" && next.preShipStatus !== undefined) {
+    next.status = next.preShipStatus;
+    delete next.preShipStatus;
+  }
+  return next;
+}
+
+// Serialize a rung from done-CARRYING chip lists. Used by drag/delete so a moved
+// chip keeps its own done — no text-match, so no leak and duplicate-safe.
+function rungFromChips(
+  rung: Rung,
+  app: { text: string; done: boolean }[],
+  portal: { text: string; done: boolean }[],
+): Rung {
   const next: Rung = { ...rung };
   const steps = [
-    ...app.map((t) => (doneApp.get(t) ? { app: t, appDone: true } : { app: t })),
-    ...portal.map((t) => (donePortal.get(t) ? { portal: t, portalDone: true } : { portal: t })),
+    ...app.map((c) => (c.done ? { app: c.text, appDone: true } : { app: c.text })),
+    ...portal.map((c) => (c.done ? { portal: c.text, portalDone: true } : { portal: c.text })),
+  ];
+  if (steps.length) next.steps = steps;
+  else delete next.steps;
+  if (app.length) next.app = app.map((c) => c.text).join(", ");
+  else delete next.app;
+  if (portal.length) next.portal = portal.map((c) => c.text).join(", ");
+  else delete next.portal;
+  return next;
+}
+
+// Rebuild from plain text lists (the modal), preserving done by text match with
+// a per-text FIFO queue so duplicate feature names don't collapse.
+function rebuildRung(rung: Rung, app: string[], portal: string[]): Rung {
+  const qApp = new Map<string, boolean[]>();
+  const qPortal = new Map<string, boolean[]>();
+  for (const s of rung.steps ?? []) {
+    if (s.app) {
+      const q = qApp.get(s.app) ?? [];
+      q.push(Boolean(s.appDone));
+      qApp.set(s.app, q);
+    }
+    if (s.portal) {
+      const q = qPortal.get(s.portal) ?? [];
+      q.push(Boolean(s.portalDone));
+      qPortal.set(s.portal, q);
+    }
+  }
+  const take = (m: Map<string, boolean[]>, t: string) => Boolean(m.get(t)?.shift());
+  const next: Rung = { ...rung };
+  const steps = [
+    ...app.map((t) => (take(qApp, t) ? { app: t, appDone: true } : { app: t })),
+    ...portal.map((t) => (take(qPortal, t) ? { portal: t, portalDone: true } : { portal: t })),
   ];
   if (steps.length) next.steps = steps;
   else delete next.steps;
@@ -253,15 +304,15 @@ export default function LadderEditor({
 
     const from = rungs.find((r) => r.id === a.rung);
     if (!from) return;
-    const fromApp = chipsOf(from, "app");
-    const fromPortal = chipsOf(from, "portal");
+    const fromApp = chipsWithDone(from, "app");
+    const fromPortal = chipsWithDone(from, "portal");
 
     if (a.rung === toRung) {
       // Reorder within the same column. A drop on the column's empty space
       // (the zone, toIdx END) is a no-op — never teleport the chip to the end.
       if (toIdx === END || toIdx === a.idx) return;
       const moved = arrayMove((a.side === "app" ? fromApp : fromPortal).slice(), a.idx, toIdx);
-      const updated = rebuildRung(
+      const updated = rungFromChips(
         from,
         a.side === "app" ? moved : fromApp,
         a.side === "portal" ? moved : fromPortal,
@@ -270,23 +321,23 @@ export default function LadderEditor({
       return;
     }
 
-    // Move the chip to another stage's same-side column.
+    // Move the chip (with its done state) to another stage's same-side column.
     const to = rungs.find((r) => r.id === toRung);
     if (!to) return;
     const srcList = (a.side === "app" ? fromApp : fromPortal).slice();
-    const [text] = srcList.splice(a.idx, 1);
-    if (text === undefined) return;
-    const toApp = chipsOf(to, "app");
-    const toPortal = chipsOf(to, "portal");
+    const [movedChip] = srcList.splice(a.idx, 1);
+    if (!movedChip) return;
+    const toApp = chipsWithDone(to, "app");
+    const toPortal = chipsWithDone(to, "portal");
     const dstList = (toSide === "app" ? toApp : toPortal).slice();
     const dest = toIdx === END ? dstList.length : toIdx;
-    dstList.splice(dest, 0, text);
-    const updatedFrom = rebuildRung(
+    dstList.splice(dest, 0, movedChip);
+    const updatedFrom = rungFromChips(
       from,
       a.side === "app" ? srcList : fromApp,
       a.side === "portal" ? srcList : fromPortal,
     );
-    const updatedTo = rebuildRung(
+    const updatedTo = rungFromChips(
       to,
       toSide === "app" ? dstList : toApp,
       toSide === "portal" ? dstList : toPortal,
@@ -299,11 +350,11 @@ export default function LadderEditor({
   function deleteChip(rungId: string, side: Side, idx: number) {
     const rung = rungs.find((r) => r.id === rungId);
     if (!rung) return;
-    const app = chipsOf(rung, "app");
-    const portal = chipsOf(rung, "portal");
+    const app = chipsWithDone(rung, "app");
+    const portal = chipsWithDone(rung, "portal");
     const list = (side === "app" ? app : portal).slice();
     list.splice(idx, 1);
-    const updated = rebuildRung(rung, side === "app" ? list : app, side === "portal" ? list : portal);
+    const updated = rungFromChips(rung, side === "app" ? list : app, side === "portal" ? list : portal);
     commitRungs(normalize(rungs.map((r) => (r.id === rungId ? updated : r))));
   }
 
@@ -330,8 +381,7 @@ export default function LadderEditor({
         }
       }
     }
-    const updated: Rung = { ...rung, steps };
-    updated.status = recomputeStatus(updated);
+    const updated = withDerivedStatus({ ...rung, steps });
     commitRungs(normalize(rungs.map((r) => (r.id === rungId ? updated : r))));
   }
 
@@ -763,7 +813,7 @@ function Chip({
             : { borderLeft: `3px solid ${accent}` }
       }
     >
-      {onToggle && (
+      {onToggle && !muted && (
         <button
           type="button"
           aria-label={done ? "Mark not done" : "Mark done"}
@@ -883,7 +933,9 @@ function StageEditor({
       if (rebuilt.portal) next.portal = rebuilt.portal;
       else delete next.portal;
     }
-    onSave(next);
+    // Manual status edit clears auto-ship tracking; then reconcile with done.
+    delete next.preShipStatus;
+    onSave(withDerivedStatus(next));
   }
 
   return (

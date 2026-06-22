@@ -16,6 +16,9 @@ export type Rung = {
   scope: string;
   runsOn: string[]; // "Web" | "App" | "Portal"
   status: RungStatus;
+  // The manual status remembered when a rung auto-ships from all-steps-done, so
+  // un-checking restores it instead of blanket-dropping to "in build".
+  preShipStatus?: RungStatus;
   band?: Band; // optional so legacy payloads still render (default "need")
   app?: string; // app surface at this rung (parity crosswalk)
   portal?: string; // portal surface at this rung
