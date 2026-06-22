@@ -34,6 +34,8 @@ import {
 const APP_COLOR = "#2563eb";
 const PORTAL_COLOR = "#3ed4b1";
 const RUNS_ON = ["Web", "App", "Portal", "API"] as const;
+// Three columns: App (left) · rung spine (centre) · Portal (right).
+const GRID = "grid grid-cols-[minmax(0,1fr)_150px_minmax(0,1fr)] gap-x-3 gap-y-1.5";
 
 function isMuted(s?: string): boolean {
   return !s || /n\/a|vision-only|no new surface|not built|stay vision/i.test(s);
@@ -46,6 +48,13 @@ function normalize(rungs: Rung[]): Rung[] {
     (a, b) =>
       BAND_ORDER.indexOf(a.band ?? "need") - BAND_ORDER.indexOf(b.band ?? "need"),
   );
+}
+
+// Display steps: the granular crosswalk if present, else the rung-level pair.
+function stepsOf(rung: Rung): { app?: string; portal?: string }[] {
+  return rung.steps && rung.steps.length > 0
+    ? rung.steps
+    : [{ app: rung.app, portal: rung.portal }];
 }
 
 export default function LadderEditor({
@@ -118,7 +127,6 @@ export default function LadderEditor({
     const activeIdx = rungs.findIndex((r) => r.id === activeIdStr);
     if (activeIdx === -1) return;
 
-    // Target band: dropping on a band lane, or onto another rung.
     let targetBand: Band;
     let overRungId: string | null = null;
     if (overId.startsWith("band:")) {
@@ -135,7 +143,6 @@ export default function LadderEditor({
       insertAt = without.findIndex((r) => r.id === overRungId);
       if (insertAt === -1) insertAt = without.length;
     } else {
-      // Dropped on an empty/whole band lane → end of that band's group.
       const last = without.map((r) => r.band ?? "need").lastIndexOf(targetBand);
       insertAt = last === -1 ? without.length : last + 1;
     }
@@ -172,7 +179,7 @@ export default function LadderEditor({
   ));
 
   return (
-    <div>
+    <div className="max-w-5xl">
       <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
         {ladder.coreRelease && (
           <span className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface/40 px-3 py-2 text-xs text-muted">
@@ -184,21 +191,20 @@ export default function LadderEditor({
           </span>
         )}
         <span className="ml-auto text-[11px] text-muted">
-          Drag to reorder · click ✎ to edit · saves automatically
+          Drag a rung to reorder · click ✎ to edit · saves automatically
         </span>
         <SaveDot state={saving} />
       </div>
 
-      {/* App / Portal column key */}
-      <div className="mb-4 flex items-center gap-4 text-xs">
-        <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: APP_COLOR }}>
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: APP_COLOR }} />
+      {/* App / Portal column headers, aligned over the two side columns */}
+      <div className={`${GRID} mb-3 items-end`}>
+        <h2 className="text-right text-base font-semibold" style={{ color: APP_COLOR }}>
           App
-        </span>
-        <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: PORTAL_COLOR }}>
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PORTAL_COLOR }} />
+        </h2>
+        <div />
+        <h2 className="text-base font-semibold" style={{ color: PORTAL_COLOR }}>
           Portal
-        </span>
+        </h2>
       </div>
 
       {mounted ? (
@@ -209,13 +215,13 @@ export default function LadderEditor({
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="max-w-3xl">{bands}</div>
+          {bands}
           <DragOverlay dropAnimation={null}>
-            {activeRung ? <RungCard rung={activeRung} overlay /> : null}
+            {activeRung ? <RungGrid rung={activeRung} overlay /> : null}
           </DragOverlay>
         </DndContext>
       ) : (
-        <div className="max-w-3xl">{bands}</div>
+        bands
       )}
 
       {editing && (
@@ -266,7 +272,7 @@ function BandLane({
   const list = (
     <div
       ref={interactive ? setNodeRef : undefined}
-      className={`flex flex-col gap-2.5 rounded-xl p-1 transition-colors ${
+      className={`flex flex-col gap-3 rounded-xl p-1 transition-colors ${
         interactive && isOver ? "bg-white/[0.03]" : ""
       }`}
     >
@@ -275,7 +281,7 @@ function BandLane({
           {interactive ? (
             <SortableRung rung={rung} onEdit={() => onEdit(rung)} />
           ) : (
-            <RungCard rung={rung} />
+            <RungGrid rung={rung} />
           )}
           {oneOhMoment && rung.id === oneOhMoment.after && (
             <OneOhMarker moment={oneOhMoment} />
@@ -322,103 +328,145 @@ function SortableRung({ rung, onEdit }: { rung: Rung; onEdit: () => void }) {
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.35 : 1,
+    opacity: isDragging ? 0.4 : 1,
   };
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <RungCard rung={rung} onEdit={onEdit} />
+    <div ref={setNodeRef} style={style}>
+      <RungGrid rung={rung} onEdit={onEdit} handle={{ ...attributes, ...listeners }} />
     </div>
   );
 }
 
-function CrosswalkLine({ side, text }: { side: "app" | "portal"; text: string }) {
+function StepChip({
+  text,
+  side,
+  tieColor,
+}: {
+  text: string;
+  side: "app" | "portal";
+  tieColor?: string;
+}) {
   const muted = isMuted(text);
-  const color = side === "app" ? APP_COLOR : PORTAL_COLOR;
+  const accent = side === "app" ? APP_COLOR : PORTAL_COLOR;
   return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: muted ? "var(--border-strong)" : color }}
-      />
-      <span
-        className={`text-[11.5px] leading-snug ${muted ? "text-muted/60" : "text-muted-strong"}`}
+    <div
+      className={`flex h-full items-center gap-2 rounded-lg px-3 py-2 ${
+        muted
+          ? "border border-dashed border-border/50"
+          : "border border-border bg-surface-elevated"
+      }`}
+      style={
+        muted
+          ? undefined
+          : side === "app"
+            ? { borderRight: `3px solid ${accent}` }
+            : { borderLeft: `3px solid ${accent}` }
+      }
+    >
+      {side === "portal" && tieColor && (
+        <span className="shrink-0 text-[11px]" style={{ color: tieColor }}>
+          ⇄
+        </span>
+      )}
+      <p
+        className={`flex-1 text-[12px] leading-snug ${
+          muted ? "text-muted/60" : "text-muted-strong"
+        } ${side === "app" ? "text-right" : ""}`}
       >
         {text}
-      </span>
+      </p>
+      {side === "app" && tieColor && (
+        <span className="shrink-0 text-[11px]" style={{ color: tieColor }}>
+          ⇄
+        </span>
+      )}
     </div>
   );
 }
 
-function RungCard({
+// One rung: App chips (left) · draggable spine (centre) · Portal chips (right).
+function RungGrid({
   rung,
-  overlay,
   onEdit,
+  handle,
+  overlay,
 }: {
   rung: Rung;
-  overlay?: boolean;
   onEdit?: () => void;
+  handle?: Record<string, unknown>;
+  overlay?: boolean;
 }) {
   const st = RUNG_STATUS[rung.status];
+  const steps = stepsOf(rung);
+  const rows = steps.length;
+
   return (
-    <article
-      className={`group/rung relative select-none rounded-xl border border-border bg-surface-elevated p-3 ${
-        overlay
-          ? "rotate-[1deg] shadow-2xl shadow-black/60 ring-1 ring-white/10"
-          : onEdit
-            ? "cursor-grab touch-none transition-colors hover:border-white/15 hover:bg-[#202023] active:cursor-grabbing"
-            : ""
-      }`}
-      style={{ borderLeft: `3px solid ${st.color}` }}
-    >
-      {onEdit && (
-        <button
-          type="button"
-          aria-label="Edit rung"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-white/10 hover:text-foreground group-hover/rung:opacity-100"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path
-              d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      )}
-      <div className="flex items-center gap-2.5">
+    <div className={GRID}>
+      <div
+        {...(handle ?? {})}
+        className={`group/rung relative flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-surface/60 px-2 py-2.5 text-center ${
+          overlay
+            ? "rotate-[1deg] shadow-2xl shadow-black/60 ring-1 ring-white/10"
+            : handle
+              ? "cursor-grab touch-none transition-colors hover:border-white/15 active:cursor-grabbing"
+              : ""
+        }`}
+        style={{ gridColumn: 2, gridRow: `1 / span ${rows}`, borderLeft: `3px solid ${st.color}` }}
+      >
+        {onEdit && (
+          <button
+            type="button"
+            aria-label="Edit rung"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-md text-muted opacity-0 transition hover:bg-white/10 hover:text-foreground group-hover/rung:opacity-100"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M4 20h4l10-10-4-4L4 16v4zM14 6l4 4"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
         <span className="font-mono text-[12px] font-semibold text-muted-strong">
           {rung.id}
         </span>
-        <span className="flex-1 pr-5 text-[13px] font-medium leading-snug text-foreground">
-          {rung.name}
-        </span>
-        <span
-          className="pill shrink-0"
-          style={{ color: st.color, backgroundColor: `${st.color}1f` }}
-        >
+        <span className="text-[12px] font-medium leading-tight">{rung.name}</span>
+        <span className="pill" style={{ color: st.color, backgroundColor: `${st.color}1f` }}>
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: st.color }} />
           {st.label}
         </span>
       </div>
-      {rung.scope && (
-        <p className="mt-1.5 line-clamp-2 text-[11.5px] leading-snug text-muted">
-          {rung.scope}
-        </p>
-      )}
-      {(rung.app || rung.portal) && (
-        <div className="mt-2 flex flex-col gap-1 border-t border-border/60 pt-2">
-          {rung.app && <CrosswalkLine side="app" text={rung.app} />}
-          {rung.portal && <CrosswalkLine side="portal" text={rung.portal} />}
-        </div>
-      )}
-    </article>
+
+      {steps.map((s, i) => {
+        const tied = !isMuted(s.app) && !isMuted(s.portal);
+        return (
+          <Fragment key={i}>
+            <div style={{ gridColumn: 1, gridRow: i + 1 }}>
+              {s.app && (
+                <StepChip text={s.app} side="app" tieColor={tied ? st.color : undefined} />
+              )}
+            </div>
+            <div style={{ gridColumn: 3, gridRow: i + 1 }}>
+              {s.portal && (
+                <StepChip
+                  text={s.portal}
+                  side="portal"
+                  tieColor={tied ? st.color : undefined}
+                />
+              )}
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
   );
 }
 
@@ -461,13 +509,27 @@ function RungEditor({
   const [status, setStatus] = useState<RungStatus>(initial?.status ?? "planned");
   const [band, setBand] = useState<Band>(initial?.band ?? initialBand);
   const [runsOn, setRunsOn] = useState<string[]>(initial?.runsOn ?? []);
-  const [app, setApp] = useState(initial?.app ?? "");
-  const [portal, setPortal] = useState(initial?.portal ?? "");
+  const [rows, setRows] = useState<{ app: string; portal: string }[]>(() => {
+    if (initial?.steps && initial.steps.length > 0)
+      return initial.steps.map((s) => ({ app: s.app ?? "", portal: s.portal ?? "" }));
+    if (initial && (initial.app || initial.portal))
+      return [{ app: initial.app ?? "", portal: initial.portal ?? "" }];
+    return [{ app: "", portal: "" }];
+  });
 
   function toggleRunsOn(v: string) {
     setRunsOn((prev) =>
       prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v],
     );
+  }
+  function setRow(i: number, key: "app" | "portal", val: string) {
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
+  }
+  function addRow() {
+    setRows((rs) => [...rs, { app: "", portal: "" }]);
+  }
+  function removeRow(i: number) {
+    setRows((rs) => (rs.length === 1 ? rs : rs.filter((_, idx) => idx !== i)));
   }
 
   function submit(e: React.FormEvent) {
@@ -475,6 +537,15 @@ function RungEditor({
     const cleanId = id.trim();
     const cleanName = name.trim();
     if (!cleanId || !cleanName) return;
+    const clean = rows
+      .map((r) => ({ app: r.app.trim(), portal: r.portal.trim() }))
+      .filter((r) => r.app || r.portal);
+    const steps = clean.map((r) => ({
+      ...(r.app ? { app: r.app } : {}),
+      ...(r.portal ? { portal: r.portal } : {}),
+    }));
+    const appJoin = clean.map((r) => r.app).filter(Boolean).join(", ");
+    const portalJoin = clean.map((r) => r.portal).filter(Boolean).join(", ");
     const next: Rung = {
       id: cleanId,
       name: cleanName,
@@ -482,9 +553,9 @@ function RungEditor({
       runsOn,
       status,
       band,
-      ...(app.trim() ? { app: app.trim() } : {}),
-      ...(portal.trim() ? { portal: portal.trim() } : {}),
-      ...(initial?.steps ? { steps: initial.steps } : {}),
+      ...(appJoin ? { app: appJoin } : {}),
+      ...(portalJoin ? { portal: portalJoin } : {}),
+      ...(steps.length ? { steps } : {}),
     };
     onSave(next);
   }
@@ -497,7 +568,7 @@ function RungEditor({
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-surface p-5"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-surface p-5"
       >
         <h3 className="mb-4 text-sm font-semibold">
           {initial ? `Edit ${initial.id}` : "New rung"}
@@ -590,36 +661,48 @@ function RungEditor({
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-4">
           <label className={LABEL}>
-            <span style={{ color: APP_COLOR }}>App</span> surface
+            Surfaces — <span style={{ color: APP_COLOR }}>App</span> ·{" "}
+            <span style={{ color: PORTAL_COLOR }}>Portal</span> (one row = ships
+            together)
           </label>
-          <input
-            value={app}
-            onChange={(e) => setApp(e.target.value)}
-            placeholder="App surface at this rung"
-            className={FIELD}
-          />
+          <div className="flex flex-col gap-1.5">
+            {rows.map((r, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <input
+                  value={r.app}
+                  onChange={(e) => setRow(i, "app", e.target.value)}
+                  placeholder="App surface"
+                  className={FIELD}
+                  style={{ borderLeft: `3px solid ${APP_COLOR}` }}
+                />
+                <input
+                  value={r.portal}
+                  onChange={(e) => setRow(i, "portal", e.target.value)}
+                  placeholder="Portal surface"
+                  className={FIELD}
+                  style={{ borderLeft: `3px solid ${PORTAL_COLOR}` }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  aria-label="Remove row"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted transition hover:bg-white/10 hover:text-foreground"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addRow}
+            className="mt-1.5 text-[12px] text-muted transition hover:text-foreground"
+          >
+            + add surface row
+          </button>
         </div>
-        <div className="mt-3">
-          <label className={LABEL}>
-            <span style={{ color: PORTAL_COLOR }}>Portal</span> surface
-          </label>
-          <input
-            value={portal}
-            onChange={(e) => setPortal(e.target.value)}
-            placeholder="Portal surface at this rung"
-            className={FIELD}
-          />
-        </div>
-
-        {initial?.steps && initial.steps.length > 0 && (
-          <p className="mt-3 text-[11px] text-muted">
-            This rung also has {initial.steps.length} granular step
-            {initial.steps.length === 1 ? "" : "s"} (kept as-is; edit the App /
-            Portal summary above).
-          </p>
-        )}
 
         <div className="mt-5 flex items-center gap-2">
           {onDelete && (
