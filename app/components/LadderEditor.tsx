@@ -718,13 +718,13 @@ function OneOhMarker({ moment }: { moment: OneOhMoment }) {
 function LaunchMarker({ moment }: { moment: OneOhMoment }) {
   return (
     <div
-      className="mx-auto my-1.5 max-w-md rounded-xl border-2 p-3 text-center"
-      style={{ borderColor: `${PORTAL_COLOR}66`, backgroundColor: `${PORTAL_COLOR}14` }}
+      className="mx-auto my-1.5 max-w-md rounded-xl border p-3 text-center"
+      style={{ borderColor: "#ffdd3355", backgroundColor: "#ffdd330f" }}
     >
-      <span className="text-sm font-bold" style={{ color: PORTAL_COLOR }}>
+      <span className="text-sm font-semibold" style={{ color: "#ffdd33" }}>
         🚀 {moment.date}
       </span>
-      <span className="ml-2 text-sm font-semibold">Launch event</span>
+      <span className="ml-2 text-sm font-medium">Launch event</span>
       {moment.label && <p className="mt-0.5 text-[12px] text-muted">{moment.label}</p>}
     </div>
   );
