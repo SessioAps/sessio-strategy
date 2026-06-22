@@ -297,6 +297,7 @@ export default function LadderEditor({
         group={group}
         interactive={mounted}
         oneOhMoment={ladder.oneOhMoment}
+        launchMoment={ladder.launchMoment ?? null}
         onEditStage={setEditing}
         onDeleteChip={deleteChip}
       />
@@ -374,6 +375,7 @@ function BandSection({
   group,
   interactive,
   oneOhMoment,
+  launchMoment,
   onEditStage,
   onDeleteChip,
 }: {
@@ -381,6 +383,7 @@ function BandSection({
   group: Rung[];
   interactive: boolean;
   oneOhMoment: OneOhMoment | null;
+  launchMoment: OneOhMoment | null;
   onEditStage: (rung: Rung) => void;
   onDeleteChip: (rungId: string, side: Side, idx: number) => void;
 }) {
@@ -393,6 +396,7 @@ function BandSection({
         key={rung.id}
         rung={rung}
         oneOhMoment={oneOhMoment}
+        launchMoment={launchMoment}
         onEditStage={() => onEditStage(rung)}
         onDeleteChip={onDeleteChip}
       />
@@ -400,6 +404,7 @@ function BandSection({
       <div key={rung.id}>
         <RowInner rung={rung} interactive={false} />
         {oneOhMoment && rung.id === oneOhMoment.after && <OneOhMarker moment={oneOhMoment} />}
+        {launchMoment && rung.id === launchMoment.after && <LaunchMarker moment={launchMoment} />}
       </div>
     ),
   );
@@ -436,11 +441,13 @@ function BandSection({
 function SortableRungRow({
   rung,
   oneOhMoment,
+  launchMoment,
   onEditStage,
   onDeleteChip,
 }: {
   rung: Rung;
   oneOhMoment: OneOhMoment | null;
+  launchMoment: OneOhMoment | null;
   onEditStage: () => void;
   onDeleteChip: (rungId: string, side: Side, idx: number) => void;
 }) {
@@ -462,6 +469,7 @@ function SortableRungRow({
         onDeleteChip={onDeleteChip}
       />
       {oneOhMoment && rung.id === oneOhMoment.after && <OneOhMarker moment={oneOhMoment} />}
+      {launchMoment && rung.id === launchMoment.after && <LaunchMarker moment={launchMoment} />}
     </div>
   );
 }
@@ -702,6 +710,22 @@ function OneOhMarker({ moment }: { moment: OneOhMoment }) {
       </span>
       <span className="ml-2 text-sm font-medium">1.0 moment</span>
       <p className="mt-0.5 text-[12px] text-muted">{moment.label}</p>
+    </div>
+  );
+}
+
+// The big public launch — a distinct, louder marker on the ladder.
+function LaunchMarker({ moment }: { moment: OneOhMoment }) {
+  return (
+    <div
+      className="mx-auto my-1.5 max-w-md rounded-xl border-2 p-3 text-center"
+      style={{ borderColor: `${PORTAL_COLOR}66`, backgroundColor: `${PORTAL_COLOR}14` }}
+    >
+      <span className="text-sm font-bold" style={{ color: PORTAL_COLOR }}>
+        🚀 {moment.date}
+      </span>
+      <span className="ml-2 text-sm font-semibold">Launch event</span>
+      {moment.label && <p className="mt-0.5 text-[12px] text-muted">{moment.label}</p>}
     </div>
   );
 }

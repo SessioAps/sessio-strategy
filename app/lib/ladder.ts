@@ -39,6 +39,9 @@ export type LadderPayload = {
   rungs: Rung[];
   coreRelease: CoreRelease | null;
   oneOhMoment: OneOhMoment | null;
+  // A second, distinct moment marker for the big public launch (28 Aug),
+  // rendered on the ladder after `after`. Same shape as the 1.0 moment.
+  launchMoment?: OneOhMoment | null;
 };
 
 export const LADDER_SOURCE = "the canonical product roadmap";
