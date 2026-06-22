@@ -21,7 +21,7 @@ export type Rung = {
   portal?: string; // portal surface at this rung
   // Granular steps, paired where app + portal must land together (one row =
   // one step; both sides set = ships simultaneously). From app-portal-parity.md.
-  steps?: { app?: string; portal?: string }[];
+  steps?: { app?: string; portal?: string; appDone?: boolean; portalDone?: boolean }[];
 };
 
 export const BAND_ORDER: Band[] = ["need", "nice", "horizon"];

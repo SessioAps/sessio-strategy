@@ -61,12 +61,50 @@ function chipsOf(rung: Rung, side: Side): string[] {
   return src.map((s) => s[side]).filter((t): t is string => Boolean(t));
 }
 
-// Rebuild ONE rung's steps[] from its app/portal chip lists. Only the rungs a
-// user actually touches get rewritten — every other rung keeps its original
-// steps, so paired {app,portal} steps elsewhere are never collaterally split.
+// Same, but carrying each chip's done state (for the checkmarks).
+function chipsWithDone(rung: Rung, side: Side): { text: string; done: boolean }[] {
+  const src =
+    rung.steps && rung.steps.length > 0
+      ? rung.steps
+      : [{ app: rung.app, portal: rung.portal }];
+  const out: { text: string; done: boolean }[] = [];
+  for (const s of src) {
+    const text = s[side];
+    if (text) out.push({ text, done: Boolean(side === "app" ? s.appDone : s.portalDone) });
+  }
+  return out;
+}
+
+// Every checkable side on a rung is done.
+function allStepsDone(rung: Rung): boolean {
+  if (!rung.steps || rung.steps.length === 0) return false;
+  return rung.steps.every((s) => (!s.app || s.appDone) && (!s.portal || s.portalDone));
+}
+
+// Status follows completion: all steps done => shipped; un-completing a shipped
+// rung drops it back to "in build". Otherwise the manual status sticks.
+function recomputeStatus(rung: Rung): RungStatus {
+  if (allStepsDone(rung)) return "shipped";
+  if (rung.status === "shipped") return "building";
+  return rung.status;
+}
+
+// Rebuild ONE rung's steps[] from its app/portal chip lists, preserving each
+// chip's done state by text match (so reordering/moving keeps the checkmarks of
+// chips that stayed). Only touched rungs are rewritten — paired {app,portal}
+// steps elsewhere are never collaterally split.
 function rebuildRung(rung: Rung, app: string[], portal: string[]): Rung {
+  const doneApp = new Map<string, boolean>();
+  const donePortal = new Map<string, boolean>();
+  for (const s of rung.steps ?? []) {
+    if (s.app) doneApp.set(s.app, Boolean(s.appDone));
+    if (s.portal) donePortal.set(s.portal, Boolean(s.portalDone));
+  }
   const next: Rung = { ...rung };
-  const steps = [...app.map((t) => ({ app: t })), ...portal.map((t) => ({ portal: t }))];
+  const steps = [
+    ...app.map((t) => (doneApp.get(t) ? { app: t, appDone: true } : { app: t })),
+    ...portal.map((t) => (donePortal.get(t) ? { portal: t, portalDone: true } : { portal: t })),
+  ];
   if (steps.length) next.steps = steps;
   else delete next.steps;
   if (app.length) next.app = app.join(", ");
@@ -269,6 +307,34 @@ export default function LadderEditor({
     commitRungs(normalize(rungs.map((r) => (r.id === rungId ? updated : r))));
   }
 
+  // Check / uncheck one feature; the stage auto-ships when all its steps are done.
+  function toggleChip(rungId: string, side: Side, chipIndex: number) {
+    const rung = rungs.find((r) => r.id === rungId);
+    if (!rung) return;
+    const steps = (
+      rung.steps && rung.steps.length
+        ? rung.steps.map((s) => ({ ...s }))
+        : [
+            ...chipsOf(rung, "app").map((t) => ({ app: t })),
+            ...chipsOf(rung, "portal").map((t) => ({ portal: t })),
+          ]
+    ) as NonNullable<Rung["steps"]>;
+    const key = side === "app" ? "appDone" : "portalDone";
+    let seen = -1;
+    for (const s of steps) {
+      if (s[side]) {
+        seen += 1;
+        if (seen === chipIndex) {
+          s[key] = !s[key];
+          break;
+        }
+      }
+    }
+    const updated: Rung = { ...rung, steps };
+    updated.status = recomputeStatus(updated);
+    commitRungs(normalize(rungs.map((r) => (r.id === rungId ? updated : r))));
+  }
+
   function saveStage(next: Rung) {
     commitRungs(normalize(rungs.map((r) => (r === editing ? next : r))));
     setEditing(null);
@@ -300,6 +366,7 @@ export default function LadderEditor({
         launchMoment={ladder.launchMoment ?? null}
         onEditStage={setEditing}
         onDeleteChip={deleteChip}
+        onToggleChip={toggleChip}
       />
     );
   });
@@ -378,6 +445,7 @@ function BandSection({
   launchMoment,
   onEditStage,
   onDeleteChip,
+  onToggleChip,
 }: {
   band: Band;
   group: Rung[];
@@ -386,6 +454,7 @@ function BandSection({
   launchMoment: OneOhMoment | null;
   onEditStage: (rung: Rung) => void;
   onDeleteChip: (rungId: string, side: Side, idx: number) => void;
+  onToggleChip: (rungId: string, side: Side, idx: number) => void;
 }) {
   const meta = BAND_META[band];
   const { setNodeRef, isOver } = useDroppable({ id: `band:${band}` });
@@ -399,6 +468,7 @@ function BandSection({
         launchMoment={launchMoment}
         onEditStage={() => onEditStage(rung)}
         onDeleteChip={onDeleteChip}
+        onToggleChip={onToggleChip}
       />
     ) : (
       <div key={rung.id}>
@@ -444,12 +514,14 @@ function SortableRungRow({
   launchMoment,
   onEditStage,
   onDeleteChip,
+  onToggleChip,
 }: {
   rung: Rung;
   oneOhMoment: OneOhMoment | null;
   launchMoment: OneOhMoment | null;
   onEditStage: () => void;
   onDeleteChip: (rungId: string, side: Side, idx: number) => void;
+  onToggleChip: (rungId: string, side: Side, idx: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: stageId(rung.id),
@@ -467,6 +539,7 @@ function SortableRungRow({
         handleProps={{ ...attributes, ...listeners }}
         onEditStage={onEditStage}
         onDeleteChip={onDeleteChip}
+        onToggleChip={onToggleChip}
       />
       {oneOhMoment && rung.id === oneOhMoment.after && <OneOhMarker moment={oneOhMoment} />}
       {launchMoment && rung.id === launchMoment.after && <LaunchMarker moment={launchMoment} />}
@@ -480,21 +553,24 @@ function RowInner({
   handleProps,
   onEditStage,
   onDeleteChip,
+  onToggleChip,
 }: {
   rung: Rung;
   interactive: boolean;
   handleProps?: Record<string, unknown>;
   onEditStage?: () => void;
   onDeleteChip?: (rungId: string, side: Side, idx: number) => void;
+  onToggleChip?: (rungId: string, side: Side, idx: number) => void;
 }) {
   return (
     <div className="flex items-center gap-3">
       <ChipColumn
         rungId={rung.id}
         side="app"
-        chips={chipsOf(rung, "app")}
+        chips={chipsWithDone(rung, "app")}
         interactive={interactive}
         onDeleteChip={onDeleteChip}
+        onToggleChip={onToggleChip}
       />
       <StageSpine
         rung={rung}
@@ -505,9 +581,10 @@ function RowInner({
       <ChipColumn
         rungId={rung.id}
         side="portal"
-        chips={chipsOf(rung, "portal")}
+        chips={chipsWithDone(rung, "portal")}
         interactive={interactive}
         onDeleteChip={onDeleteChip}
+        onToggleChip={onToggleChip}
       />
     </div>
   );
@@ -573,12 +650,14 @@ function ChipColumn({
   chips,
   interactive,
   onDeleteChip,
+  onToggleChip,
 }: {
   rungId: string;
   side: Side;
-  chips: string[];
+  chips: { text: string; done: boolean }[];
   interactive: boolean;
   onDeleteChip?: (rungId: string, side: Side, idx: number) => void;
+  onToggleChip?: (rungId: string, side: Side, idx: number) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: zoneId(rungId, side) });
   const inner = (
@@ -591,17 +670,19 @@ function ChipColumn({
       {interactive && chips.length === 0 && (
         <span className="px-2 py-1 text-[11px] text-muted/40">drop here</span>
       )}
-      {chips.map((text, i) =>
+      {chips.map((chip, i) =>
         interactive ? (
           <SortableChip
             key={i}
             id={chipId(rungId, side, i)}
-            text={text}
+            text={chip.text}
             side={side}
+            done={chip.done}
             onDelete={() => onDeleteChip?.(rungId, side, i)}
+            onToggle={() => onToggleChip?.(rungId, side, i)}
           />
         ) : (
-          <Chip key={i} text={text} side={side} />
+          <Chip key={i} text={chip.text} side={side} done={chip.done} />
         ),
       )}
     </div>
@@ -622,12 +703,16 @@ function SortableChip({
   id,
   text,
   side,
+  done,
   onDelete,
+  onToggle,
 }: {
   id: string;
   text: string;
   side: Side;
+  done: boolean;
   onDelete: () => void;
+  onToggle: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -639,7 +724,7 @@ function SortableChip({
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="max-w-full">
-      <Chip text={text} side={side} onDelete={onDelete} draggable />
+      <Chip text={text} side={side} done={done} onDelete={onDelete} onToggle={onToggle} draggable />
     </div>
   );
 }
@@ -647,13 +732,17 @@ function SortableChip({
 function Chip({
   text,
   side,
+  done,
   onDelete,
+  onToggle,
   draggable,
   overlay,
 }: {
   text: string;
   side: Side;
+  done?: boolean;
   onDelete?: () => void;
+  onToggle?: () => void;
   draggable?: boolean;
   overlay?: boolean;
 }) {
@@ -665,7 +754,7 @@ function Chip({
         muted ? "border border-dashed border-border/50" : "border border-border bg-surface-elevated"
       } ${draggable ? "cursor-grab touch-none active:cursor-grabbing" : ""} ${
         overlay ? "rotate-[1deg] shadow-2xl shadow-black/60 ring-1 ring-white/10" : ""
-      }`}
+      } ${done ? "opacity-75" : ""}`}
       style={
         muted
           ? undefined
@@ -674,10 +763,28 @@ function Chip({
             : { borderLeft: `3px solid ${accent}` }
       }
     >
+      {onToggle && (
+        <button
+          type="button"
+          aria-label={done ? "Mark not done" : "Mark done"}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] leading-none transition ${
+            done
+              ? "border-transparent bg-[#3ed4b1] text-background"
+              : "border-border-strong text-transparent hover:border-foreground"
+          }`}
+        >
+          ✓
+        </button>
+      )}
       <p
-        className={`text-[12px] leading-snug ${muted ? "text-muted/60" : "text-muted-strong"} ${
-          side === "app" ? "text-right" : ""
-        }`}
+        className={`text-[12px] leading-snug ${
+          done ? "text-muted/50 line-through" : muted ? "text-muted/60" : "text-muted-strong"
+        } ${side === "app" ? "text-right" : ""}`}
       >
         {text}
       </p>
@@ -767,13 +874,14 @@ function StageEditor({
     // single-sided ones) when they actually changed — a pure rename/status/band
     // edit keeps the original steps[] intact.
     if (!sameList(a, chipsOf(initial, "app")) || !sameList(p, chipsOf(initial, "portal"))) {
-      const steps = [...a.map((t) => ({ app: t })), ...p.map((t) => ({ portal: t }))];
-      if (a.length) next.app = a.join(", ");
-      else delete next.app;
-      if (p.length) next.portal = p.join(", ");
-      else delete next.portal;
-      if (steps.length) next.steps = steps;
+      // rebuildRung preserves each surviving chip's done state by text match.
+      const rebuilt = rebuildRung(initial, a, p);
+      if (rebuilt.steps) next.steps = rebuilt.steps;
       else delete next.steps;
+      if (rebuilt.app) next.app = rebuilt.app;
+      else delete next.app;
+      if (rebuilt.portal) next.portal = rebuilt.portal;
+      else delete next.portal;
     }
     onSave(next);
   }
