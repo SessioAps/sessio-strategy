@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLadder, saveLadder } from "@/app/lib/store";
+import { appendChange, getLadder, saveLadder } from "@/app/lib/store";
 import type { LadderPayload } from "@/app/lib/ladder";
 
 // Always hit storage fresh; never cache the ladder.
@@ -27,6 +27,11 @@ export async function PUT(request: Request) {
   }
   try {
     await saveLadder(payload);
+    await appendChange({
+      at: new Date().toISOString(),
+      kind: "ladder",
+      summary: "Ladder edited (rungs moved / fields changed)",
+    });
   } catch {
     return NextResponse.json({ error: "save failed" }, { status: 500 });
   }
