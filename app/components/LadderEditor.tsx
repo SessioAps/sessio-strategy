@@ -169,6 +169,9 @@ export default function LadderEditor({
       if (activeIdx === -1) return;
       if (overStr.startsWith("band:")) {
         const targetBand = overStr.slice(5) as Band;
+        // Dropping on your own band's lane is a no-op — don't snap the stage to
+        // the bottom of its band (mirrors the chip same-column zone guard).
+        if (targetBand === (rungs[activeIdx].band ?? "need")) return;
         const moved: Rung = { ...rungs[activeIdx], band: targetBand };
         const without = rungs.filter((r) => r.id !== aId);
         const last = without.map((r) => r.band ?? "need").lastIndexOf(targetBand);
