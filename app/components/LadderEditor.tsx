@@ -61,16 +61,23 @@ function chipsOf(rung: Rung, side: Side): string[] {
   return src.map((s) => s[side]).filter((t): t is string => Boolean(t));
 }
 
-// Same, but carrying each chip's done state (for the checkmarks).
-function chipsWithDone(rung: Rung, side: Side): { text: string; done: boolean }[] {
+type DChip = { text: string; done: boolean; detail: string[] };
+
+// Carry each chip's done state + its drill-in detail.
+function chipsWithDone(rung: Rung, side: Side): DChip[] {
   const src =
     rung.steps && rung.steps.length > 0
       ? rung.steps
       : [{ app: rung.app, portal: rung.portal }];
-  const out: { text: string; done: boolean }[] = [];
+  const out: DChip[] = [];
   for (const s of src) {
     const text = s[side];
-    if (text) out.push({ text, done: Boolean(side === "app" ? s.appDone : s.portalDone) });
+    if (text)
+      out.push({
+        text,
+        done: Boolean(side === "app" ? s.appDone : s.portalDone),
+        detail: (side === "app" ? s.appDetail : s.portalDetail) ?? [],
+      });
   }
   return out;
 }
@@ -114,15 +121,19 @@ function withDerivedStatus(rung: Rung): Rung {
 
 // Serialize a rung from done-CARRYING chip lists. Used by drag/delete so a moved
 // chip keeps its own done — no text-match, so no leak and duplicate-safe.
-function rungFromChips(
-  rung: Rung,
-  app: { text: string; done: boolean }[],
-  portal: { text: string; done: boolean }[],
-): Rung {
+function rungFromChips(rung: Rung, app: DChip[], portal: DChip[]): Rung {
   const next: Rung = { ...rung };
   const steps = [
-    ...app.map((c) => (c.done ? { app: c.text, appDone: true } : { app: c.text })),
-    ...portal.map((c) => (c.done ? { portal: c.text, portalDone: true } : { portal: c.text })),
+    ...app.map((c) => ({
+      app: c.text,
+      ...(c.done ? { appDone: true } : {}),
+      ...(c.detail.length ? { appDetail: c.detail } : {}),
+    })),
+    ...portal.map((c) => ({
+      portal: c.text,
+      ...(c.done ? { portalDone: true } : {}),
+      ...(c.detail.length ? { portalDetail: c.detail } : {}),
+    })),
   ];
   if (steps.length) next.steps = steps;
   else delete next.steps;
@@ -704,7 +715,7 @@ function ChipColumn({
 }: {
   rungId: string;
   side: Side;
-  chips: { text: string; done: boolean }[];
+  chips: DChip[];
   interactive: boolean;
   onDeleteChip?: (rungId: string, side: Side, idx: number) => void;
   onToggleChip?: (rungId: string, side: Side, idx: number) => void;
@@ -728,11 +739,12 @@ function ChipColumn({
             text={chip.text}
             side={side}
             done={chip.done}
+            detail={chip.detail}
             onDelete={() => onDeleteChip?.(rungId, side, i)}
             onToggle={() => onToggleChip?.(rungId, side, i)}
           />
         ) : (
-          <Chip key={i} text={chip.text} side={side} done={chip.done} />
+          <Chip key={i} text={chip.text} side={side} done={chip.done} detail={chip.detail} />
         ),
       )}
     </div>
@@ -754,6 +766,7 @@ function SortableChip({
   text,
   side,
   done,
+  detail,
   onDelete,
   onToggle,
 }: {
@@ -761,6 +774,7 @@ function SortableChip({
   text: string;
   side: Side;
   done: boolean;
+  detail: string[];
   onDelete: () => void;
   onToggle: () => void;
 }) {
@@ -774,7 +788,7 @@ function SortableChip({
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="max-w-full">
-      <Chip text={text} side={side} done={done} onDelete={onDelete} onToggle={onToggle} draggable />
+      <Chip text={text} side={side} done={done} detail={detail} onDelete={onDelete} onToggle={onToggle} draggable />
     </div>
   );
 }
@@ -783,6 +797,7 @@ function Chip({
   text,
   side,
   done,
+  detail,
   onDelete,
   onToggle,
   draggable,
@@ -791,16 +806,19 @@ function Chip({
   text: string;
   side: Side;
   done?: boolean;
+  detail?: string[];
   onDelete?: () => void;
   onToggle?: () => void;
   draggable?: boolean;
   overlay?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const muted = isMuted(text);
   const accent = side === "app" ? APP_COLOR : PORTAL_COLOR;
+  const hasDetail = Boolean(detail && detail.length);
   return (
     <div
-      className={`group/chip relative flex items-center gap-2 rounded-lg px-3 py-2 ${
+      className={`group/chip relative flex flex-col rounded-lg ${
         muted ? "border border-dashed border-border/50" : "border border-border bg-surface-elevated"
       } ${draggable ? "cursor-grab touch-none active:cursor-grabbing" : ""} ${
         overlay ? "rotate-[1deg] shadow-2xl shadow-black/60 ring-1 ring-white/10" : ""
@@ -813,44 +831,73 @@ function Chip({
             : { borderLeft: `3px solid ${accent}` }
       }
     >
-      {onToggle && !muted && (
-        <button
-          type="button"
-          aria-label={done ? "Mark not done" : "Mark done"}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] leading-none transition ${
-            done
-              ? "border-transparent bg-[#3ed4b1] text-background"
-              : "border-border-strong text-transparent hover:border-foreground"
-          }`}
+      <div className="flex items-center gap-2 px-3 py-2">
+        {onToggle && !muted && (
+          <button
+            type="button"
+            aria-label={done ? "Mark not done" : "Mark done"}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px] leading-none transition ${
+              done
+                ? "border-transparent bg-[#3ed4b1] text-background"
+                : "border-border-strong text-transparent hover:border-foreground"
+            }`}
+          >
+            ✓
+          </button>
+        )}
+        <p
+          className={`flex-1 text-[12px] leading-snug ${
+            done ? "text-muted/50 line-through" : muted ? "text-muted/60" : "text-muted-strong"
+          } ${side === "app" ? "text-right" : ""}`}
         >
-          ✓
-        </button>
-      )}
-      <p
-        className={`text-[12px] leading-snug ${
-          done ? "text-muted/50 line-through" : muted ? "text-muted/60" : "text-muted-strong"
-        } ${side === "app" ? "text-right" : ""}`}
-      >
-        {text}
-      </p>
-      {onDelete && (
-        <button
-          type="button"
-          aria-label="Remove feature"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 transition hover:bg-white/10 hover:text-foreground group-hover/chip:opacity-100"
-        >
-          ×
-        </button>
+          {text}
+        </p>
+        {hasDetail && (
+          <button
+            type="button"
+            aria-label={open ? "Hide detail" : "Show detail"}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen((o) => !o);
+            }}
+            className="flex shrink-0 items-center gap-0.5 rounded px-1 text-[10px] text-muted transition hover:text-foreground"
+          >
+            <span className="transition-transform" style={{ transform: open ? "rotate(90deg)" : "none" }}>
+              ▸
+            </span>
+            {detail!.length}
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            aria-label="Remove feature"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted opacity-0 transition hover:bg-white/10 hover:text-foreground group-hover/chip:opacity-100"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {open && hasDetail && (
+        <ul className="flex flex-col gap-1 border-t border-border/60 px-3 py-2 text-left text-[11px] leading-snug text-muted">
+          {detail!.map((d, i) => (
+            <li key={i} className="flex gap-1.5">
+              <span className="text-muted/40">·</span>
+              <span>{d}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
