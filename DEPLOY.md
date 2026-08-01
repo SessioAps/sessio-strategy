@@ -72,6 +72,35 @@ docker rm -f roadmap-strategy
 Live edits made in the app persist to `/opt/roadmap-data` (the mounted volume), so
 they survive rebuilds. `git pull` only updates code, not the data volume.
 
+## Docs sync — RETIRED (2026-08-01)
+
+`scripts/sync-to-docs.sh` (ran on Johannes's Mac as the "roadmap-morning-sync"
+daily task) and `scripts/sync-to-docs-box.sh` (systemd timer on the box) used to
+regenerate `Sessio-docs/docs/roadmap/site-state/` wholesale from the editor's
+`ladder.json` and push straight to `main`. The M-ladder was retired as the live
+sequencing model on 2026-07-09; the site-state snapshot in Sessio-docs is now a
+frozen historical mirror with a RETIRED banner. A restarted sync would overwrite
+that banner and resurrect the stale ladder as if it were current — so the sync
+is retired for good, not paused. Both scripts are deleted (git history keeps
+them). Last sync commit: 2026-06-24.
+
+The push credential is already dead: Sessio-docs has no deploy keys registered
+(verified 2026-08-01), so the box's `~/.ssh/sessio-docs-deploy` key can no
+longer push even if the timer fires. Remaining sweep, next time someone is on
+the box (`johannes@91.99.222.209`):
+
+```bash
+systemctl list-timers --all | grep -i -e sync -e docs   # find the timer
+sudo systemctl disable --now <name>.timer <name>.service
+sudo rm /etc/systemd/system/<name>.timer /etc/systemd/system/<name>.service
+sudo systemctl daemon-reload
+rm -f ~/.ssh/sessio-docs-deploy ~/.ssh/sessio-docs-deploy.pub   # orphaned key
+rm -rf ~/Sessio-docs                                            # push clone, unused
+```
+
+And on Johannes's Mac: remove the "roadmap-morning-sync" daily task if still
+installed (its half last committed 2026-06-22).
+
 ## Local development
 
 ```bash
