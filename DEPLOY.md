@@ -60,17 +60,43 @@ The three JSON files are private and not in the repo. They're currently staged a
 them to `/opt/roadmap-data` on the new box. (Or Johannes can hand them over from
 his Mac at `sessio-roadmap/.data/`.)
 
+## The actual box (verified 2026-08-01)
+
+Reality has drifted from the fresh-box recipe above. `roadmap.sessio.io` runs on
+the **shared** web box `sessio-web` (`91.99.222.209`) next to sessio-operator,
+publisher-portal and sessio-org-admin, all fronted by a **Caddy container** on
+the docker network `web` - the container publishes **no host port**; Caddy
+reaches it by name. Data is mounted from **`/opt/roadmap/data`** (not
+`/opt/roadmap-data`), there is **no `/opt/roadmap.env`** (env was passed
+directly at `docker run`), and `/home/johannes/roadmap-strategy` is **not a git
+clone** - there is no usable checkout of this repo on the box.
+
 ## Updating
 
+There is no clone to `git pull` on the box. Ship a source archive from a
+machine that has the repo, build on the box, swap the container:
+
 ```bash
-cd ~/roadmap-strategy && git pull
-docker build -t roadmap-strategy:latest .
-docker rm -f roadmap-strategy
-# re-run the `docker run …` from step 4
+# From your clone (git pull first - the investor fix is 8f830ee):
+git archive --format=tar.gz HEAD | ssh <user>@91.99.222.209 \
+  'rm -rf /tmp/rs-build && mkdir -p /tmp/rs-build && tar -xz -C /tmp/rs-build'
+
+# On the box:
+cd /tmp/rs-build && sudo docker build -t roadmap-strategy:latest .
+# One-time: persist the runtime env out of the old container (never into git):
+sudo docker inspect roadmap-strategy \
+  --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  | grep -E '^(ROADMAP_PASSWORD|ROADMAP_INVESTOR_PASSWORD|NODE_ENV)=' \
+  | sudo tee /opt/roadmap.env >/dev/null && sudo chmod 600 /opt/roadmap.env
+sudo docker rm -f roadmap-strategy
+sudo docker run -d --name roadmap-strategy --restart unless-stopped \
+  --network web --env-file /opt/roadmap.env \
+  -v /opt/roadmap/data:/app/.data roadmap-strategy:latest
 ```
 
-Live edits made in the app persist to `/opt/roadmap-data` (the mounted volume), so
-they survive rebuilds. `git pull` only updates code, not the data volume.
+Verify: `https://roadmap.sessio.io` still gates to `/login`; log in and check
+the changed page. Live edits made in the app persist to `/opt/roadmap/data`
+(the mounted volume), so they survive rebuilds.
 
 ## Docs sync — RETIRED (2026-08-01)
 
@@ -86,14 +112,16 @@ them). Last sync commit: 2026-06-24.
 
 The push credential is already dead: Sessio-docs has no deploy keys registered
 (verified 2026-08-01), so the box's `~/.ssh/sessio-docs-deploy` key can no
-longer push even if the timer fires. Remaining sweep, next time someone is on
-the box (`johannes@91.99.222.209`):
+longer push even if the timer fires. And it does still fire: recon on
+2026-08-01 found `roadmap-docs-sync.timer` armed and running daily at 07:40 UTC
+(last run that morning), failing silently. Box-side sweep, verified names and
+paths (run as johannes, with sudo):
 
 ```bash
-systemctl list-timers --all | grep -i -e sync -e docs   # find the timer
-sudo systemctl disable --now <name>.timer <name>.service
-sudo rm /etc/systemd/system/<name>.timer /etc/systemd/system/<name>.service
+sudo systemctl disable --now roadmap-docs-sync.timer
+sudo rm /etc/systemd/system/roadmap-docs-sync.timer /etc/systemd/system/roadmap-docs-sync.service
 sudo systemctl daemon-reload
+rm -f ~/sync-docs.sh                                            # the box copy of the script
 rm -f ~/.ssh/sessio-docs-deploy ~/.ssh/sessio-docs-deploy.pub   # orphaned key
 rm -rf ~/Sessio-docs                                            # push clone, unused
 ```
