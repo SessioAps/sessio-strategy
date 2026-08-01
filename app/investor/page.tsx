@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { AUTH_COOKIE, roleForCookie } from "@/app/lib/auth";
-import { getEvents, getInvestorBoard, getLadder, getTeam } from "@/app/lib/store";
+import { getEvents, getInvestorBoard, getTeam } from "@/app/lib/store";
 import PostUpdate from "./PostUpdate";
 
 export const dynamic = "force-dynamic";
@@ -14,18 +14,15 @@ export default async function InvestorPage() {
   );
   const isTeam = role === "team";
 
-  const [board, events, ladder, team] = await Promise.all([
+  const [board, events, team] = await Promise.all([
     getInvestorBoard(),
     getEvents(),
-    getLadder(),
     getTeam(),
   ]);
   // Progress, not promises: only what has already shipped/happened. No dated
   // forward commitments on the investor board — momentum lives in the updates.
   const inv = events.filter((e) => e.investor);
   const wins = inv.filter((e) => e.status === "done").slice(-6).reverse();
-  const shipped = ladder.rungs.filter((r) => r.status === "shipped").length;
-  const building = ladder.rungs.find((r) => r.status === "building");
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12 md:py-16">
@@ -48,25 +45,18 @@ export default async function InvestorPage() {
         </p>
       </header>
 
-      {/* Product pulse — safe, high-level */}
-      {ladder.rungs.length > 0 && (
-        <section className="mt-7">
-          <div className="flex items-end gap-1">
-            {ladder.rungs.map((r) => (
-              <div
-                key={r.id}
-                title={`${r.id} — ${r.name}`}
-                className="h-6 flex-1 rounded-sm"
-                style={{ backgroundColor: r.status === "shipped" ? "#3ed4b1" : r.status === "building" ? "#2563eb" : "#2a2a2e" }}
-              />
-            ))}
-          </div>
-          <p className="mt-2.5 text-[13px] text-muted-strong">
-            {shipped} of {ladder.rungs.length} product milestones shipped
-            {building ? <> · now building <span className="font-medium text-foreground">{building.name}</span></> : null}
-          </p>
-        </section>
-      )}
+      {/* Product pulse — a static "live today" line. The M-ladder progress bar
+          that rendered here was retired 2026-07-09 (the built product is the
+          plan); momentum lives in Recent wins + Updates, not in rung counts. */}
+      <section className="mt-7">
+        <p className="text-[14px] leading-relaxed text-muted-strong">
+          <span className="font-medium text-foreground">Live today:</span> the
+          Sessio app (Hub · Discover · Songs · Sessions), the artist portal on{" "}
+          <span className="text-foreground">sessio.io</span>, and the operator
+          console behind our white-glove onboarding. Shipping is continuous;
+          the latest lands under Updates below.
+        </p>
+      </section>
 
       {/* Recent wins — only what has actually shipped/happened */}
       {wins.length > 0 && (
